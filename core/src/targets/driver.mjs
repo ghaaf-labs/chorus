@@ -31,3 +31,4 @@
  * Drivers must NOT depend on logging, registry, or any other core module.
  */
 export const SUBPROCESS = "subprocess";
+export const ACP = "acp";

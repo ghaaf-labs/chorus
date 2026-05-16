@@ -5,8 +5,9 @@ import * as claudeDriver from "./targets/claude.mjs";
 import * as codexDriver from "./targets/codex.mjs";
 import * as opencodeDriver from "./targets/opencode.mjs";
 import * as grokDriver from "./targets/grok.mjs";
-import { SUBPROCESS } from "./targets/driver.mjs";
+import { SUBPROCESS, ACP } from "./targets/driver.mjs";
 import { runSubprocess } from "./runners/process.mjs";
+import { runAcp } from "./runners/acp.mjs";
 import { composePrompt } from "./roles/compose.mjs";
 import { validateAndTrim } from "./summarize.mjs";
 import { generateJobId, JobLogger, newJobLogPath, appendJobIndex } from "./logging.mjs";
@@ -59,7 +60,8 @@ export async function callOne({
   timeoutS = DEFAULTS.timeout_s,
   maxTokens = DEFAULTS.max_tokens,
   allowSelf = false,
-  registry: providedRegistry
+  registry: providedRegistry,
+  mode: requestedMode
 } = {}) {
   const preGuards = checkGuards({ source, target: requestedTarget ?? "<auto>", role });
   if (preGuards.blocked) {
@@ -94,7 +96,7 @@ export async function callOne({
     });
   }
 
-  const mode = driver.runModes[0] ?? SUBPROCESS;
+  const mode = pickMode(driver, requestedMode);
   const composed = composePrompt({
     role,
     sourceHost: source,
@@ -145,7 +147,26 @@ export async function callOne({
     });
   }
 
-  if (mode !== SUBPROCESS) {
+  const childExtraEnv = childEnv({ source, target, role });
+  let runResult;
+  if (mode === ACP) {
+    runResult = await runAcp({
+      spec,
+      childEnv: childExtraEnv,
+      timeoutS,
+      logger,
+      target,
+      model,
+      cwd: process.cwd()
+    });
+  } else if (mode === SUBPROCESS) {
+    runResult = await runSubprocess({
+      spec,
+      childEnv: childExtraEnv,
+      timeoutS,
+      logger
+    });
+  } else {
     logger.event("build_invocation_error", { error: `mode ${mode} not implemented` });
     await logger.close();
     return errorEnvelope({
@@ -154,13 +175,6 @@ export async function callOne({
       detail: { mode }
     });
   }
-
-  const runResult = await runSubprocess({
-    spec,
-    childEnv: childEnv({ source, target, role }),
-    timeoutS,
-    logger
-  });
 
   const payloadPath = await logger.payloadFile({
     prompt: spec.stdin,
@@ -232,6 +246,24 @@ export async function callOne({
       ? [`truncated ${validation.fields_truncated.length} string field(s)`]
       : []
   };
+}
+
+function pickMode(driver, requested) {
+  const supported = driver.runModes || [SUBPROCESS];
+  if (requested) {
+    if (!supported.includes(requested)) {
+      throw new Error(`target "${driver.id}" does not support mode "${requested}"; supported: ${supported.join(",")}`);
+    }
+    return requested;
+  }
+  if (process.env.CHORUS_FORCE_MODE) {
+    const forced = process.env.CHORUS_FORCE_MODE;
+    if (supported.includes(forced)) return forced;
+  }
+  if (process.env.CHORUS_DISABLE_ACP === "1") {
+    return supported.find((m) => m !== ACP) || supported[0];
+  }
+  return supported[0];
 }
 
 function projectErrorDetail(runResult) {

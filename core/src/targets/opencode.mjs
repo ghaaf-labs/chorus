@@ -1,10 +1,10 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { SUBPROCESS } from "./driver.mjs";
+import { SUBPROCESS, ACP } from "./driver.mjs";
 
 export const id = "opencode";
-export const runModes = [SUBPROCESS];
+export const runModes = [ACP, SUBPROCESS];
 
 const AGENT_DIR = path.join(os.homedir(), ".config", "opencode", "agent");
 const AGENT_NAME = "chorus-buddy";
@@ -51,6 +51,14 @@ function ensureAgentInstalled() {
 }
 
 export function buildInvocation({ mode, prompt, model }) {
+  if (mode === ACP) {
+    return {
+      command: "opencode",
+      args: ["acp", "--pure"],
+      env: {},
+      prompt
+    };
+  }
   if (mode !== SUBPROCESS) {
     throw new Error(`opencode driver does not support mode "${mode}"`);
   }
@@ -70,11 +78,17 @@ export function buildInvocation({ mode, prompt, model }) {
 }
 
 export function extractAssistant(runResult, mode) {
+  if (mode === ACP) {
+    return runResult.stdout ?? "";
+  }
   if (mode !== SUBPROCESS) throw new Error("unsupported mode");
   return extractAssistantText(runResult.stdout || "");
 }
 
 export function extractTokens(runResult, mode) {
+  if (mode === ACP) {
+    return { input: 0, output: 0, total: 0 };
+  }
   if (mode !== SUBPROCESS) throw new Error("unsupported mode");
   return extractTokensFromStdout(runResult.stdout || "");
 }

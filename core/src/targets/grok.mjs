@@ -1,9 +1,17 @@
-import { SUBPROCESS } from "./driver.mjs";
+import { SUBPROCESS, ACP } from "./driver.mjs";
 
 export const id = "grok";
-export const runModes = [SUBPROCESS];
+export const runModes = [ACP, SUBPROCESS];
 
 export function buildInvocation({ mode, prompt, model }) {
+  if (mode === ACP) {
+    return {
+      command: "grok",
+      args: ["agent", "stdio"],
+      env: model ? { GROK_MODEL: model } : {},
+      prompt
+    };
+  }
   if (mode !== SUBPROCESS) {
     throw new Error(`grok driver does not support mode "${mode}"`);
   }
@@ -25,11 +33,17 @@ export function buildInvocation({ mode, prompt, model }) {
 }
 
 export function extractAssistant(runResult, mode) {
+  if (mode === ACP) {
+    return runResult.stdout ?? "";
+  }
   if (mode !== SUBPROCESS) throw new Error("unsupported mode");
   return extractAssistantText(runResult.stdout || "");
 }
 
 export function extractTokens(runResult, mode) {
+  if (mode === ACP) {
+    return { input: 0, output: 0, total: 0 };
+  }
   if (mode !== SUBPROCESS) throw new Error("unsupported mode");
   return extractTokensFromStdout(runResult.stdout || "");
 }

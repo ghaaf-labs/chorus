@@ -69,13 +69,17 @@ let saved = {};
 beforeEach(() => {
   tmpLogDir = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-matrix-"));
   saved.CHORUS_REPO_ROOT = process.env.CHORUS_REPO_ROOT;
+  saved.CHORUS_FORCE_MODE = process.env.CHORUS_FORCE_MODE;
   process.env.CHORUS_REPO_ROOT = tmpLogDir;
+  process.env.CHORUS_FORCE_MODE = "subprocess";
   process.env.CHORUS_STUB_MODE = "ok";
 });
 
 afterEach(() => {
   if (saved.CHORUS_REPO_ROOT === undefined) delete process.env.CHORUS_REPO_ROOT;
   else process.env.CHORUS_REPO_ROOT = saved.CHORUS_REPO_ROOT;
+  if (saved.CHORUS_FORCE_MODE === undefined) delete process.env.CHORUS_FORCE_MODE;
+  else process.env.CHORUS_FORCE_MODE = saved.CHORUS_FORCE_MODE;
   delete process.env.CHORUS_STUB_MODE;
   try { fs.rmSync(tmpLogDir, { recursive: true, force: true }); } catch { /* ignore */ }
 });
