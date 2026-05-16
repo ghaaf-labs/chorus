@@ -214,6 +214,17 @@ export class AcpClient extends EventEmitter {
     }
   }
 
+  cancelSession(sessionId) {
+    if (this._closed) return;
+    try {
+      this._send(buildSessionCancelNotification(sessionId));
+    } catch { /* ignore */ }
+    for (const [id, { reject }] of this.pending.entries()) {
+      reject(new Error("acp_prompt_aborted"));
+      this.pending.delete(id);
+    }
+  }
+
   async close() {
     if (this._closed) return;
     try {

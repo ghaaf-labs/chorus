@@ -4,6 +4,7 @@ import { callCouncil } from "./council.mjs";
 import { refreshRegistry, readRegistry, loadOrRefresh } from "./registry.mjs";
 import { readJobIndex } from "./logging.mjs";
 import { ROLE_NAMES, pickDefaultRole } from "./roles/defaults.mjs";
+import { findJobById, loadJobPayload } from "./replay.mjs";
 
 const USAGE = `chorus — multi-CLI agent collaboration
 
@@ -11,11 +12,12 @@ usage:
   chorus call --target <name> --role <name> --task "<text>" [opts]
   chorus council --role <name> --targets a,b,c --task "<text>" [opts]
   chorus benchmark [--role <name>] [--task "<text>"] [--targets a,b,c] [--json]
+  chorus replay <job_id> [--target <name>] [--role <name>] [--source <name>] [--model <id>]
   chorus acp                      start ACP server on stdio (for Zed/JetBrains/etc)
   chorus setup [--refresh-stale <hours>]
   chorus doctor
   chorus status [--json]
-  chorus history [--source <name>] [--target <name>] [--role <name>] [--limit N] [--json]
+  chorus history [--source <name>] [--target <name>] [--role <name>] [--since <Ns|Nm|Nh|Nd>] [--limit N] [--json]
   chorus version
 
 call/council options:
@@ -29,7 +31,7 @@ call/council options:
   --allow-self                allow target == source
   --output-format json|text   default: json
   --target <name>             one of: claude-code, codex, grok, opencode
-  --role <name>               one of: ${ROLE_NAMES.join(", ")}
+  --role <name>               one of: ${ROLE_NAMES.join(", ")} (auto-routed from --task if omitted)
 
 env:
   CHORUS_DEPTH, CHORUS_MAX_DEPTH (default 2), CHORUS_TRACE
@@ -55,6 +57,8 @@ export async function main(argv) {
       return cmdCouncil(parseFlags(rest));
     case "benchmark":
       return cmdBenchmark(parseFlags(rest));
+    case "replay":
+      return cmdReplay(parseFlags(rest));
     case "acp":
       return cmdAcp();
     case "setup":
@@ -111,12 +115,16 @@ async function cmdCall(flags) {
     process.stderr.write(`missing required: ${missing.join(", ")}\n`);
     return 2;
   }
-  const role = flags.role || (flags["auto-role"] ? pickDefaultRole(flags.task) : null);
+  let role = flags.role;
+  let autoRouted = false;
   if (!role) {
-    process.stderr.write(`missing required: --role (or pass --auto-role)\n`);
-    return 2;
+    role = pickDefaultRole(flags.task);
+    autoRouted = true;
   }
   flags.role = role;
+  if (autoRouted) {
+    process.stderr.write(`[chorus: auto-routed to role=${role}]\n`);
+  }
 
   const inputText = flags["input-file"]
     ? fs.readFileSync(flags["input-file"], "utf8")
@@ -256,6 +264,41 @@ async function cmdBenchmark(flags) {
   return 0;
 }
 
+async function cmdReplay(flags) {
+  const jobId = flags._?.[0];
+  if (!jobId) {
+    process.stderr.write("missing required: <job_id>\n");
+    return 2;
+  }
+  const entry = findJobById(jobId);
+  if (!entry) {
+    process.stderr.write(`chorus: no job found with id '${jobId}'\n`);
+    return 2;
+  }
+  const payload = entry.log_path ? loadJobPayload(entry.log_path) : null;
+  if (!payload || !payload.task) {
+    process.stderr.write(`chorus: job '${jobId}' is missing task payload — pre-M6 jobs are not replayable\n`);
+    return 2;
+  }
+  const target = flags.target || entry.target;
+  const role = flags.role || entry.role;
+  const source = flags.source || `replay:${entry.source}`;
+  const model = flags.model || entry.model || undefined;
+  process.stderr.write(`[chorus: replay ${jobId} → ${source}→${target} role=${role}${model ? ` model=${model}` : ""}]\n`);
+  const result = await callOne({
+    source,
+    target,
+    role,
+    task: payload.task,
+    inputText: payload.input_text ?? undefined,
+    model,
+    parentJobId: entry.job_id,
+    allowSelf: true
+  });
+  emit(result, flags["output-format"] ?? "json");
+  return result.ok ? 0 : 1;
+}
+
 async function cmdAcp() {
   const { runAcpServer } = await import("./acp/server.mjs");
   await runAcpServer();
@@ -279,7 +322,10 @@ async function cmdDoctor() {
   ];
   for (const [name, info] of Object.entries(data.hosts)) {
     if (info.available) {
-      lines.push(`  ${name.padEnd(14)} ✓  ${info.version || ""}`.trimEnd());
+      const bridge = info.acp_bridge
+        ? (info.acp_bridge_installed ? `  [acp bridge: ${info.acp_bridge} ✓]` : `  [acp bridge: ${info.acp_bridge} not installed]`)
+        : "";
+      lines.push(`  ${name.padEnd(14)} ✓  ${info.version || ""}${bridge}`.trimEnd());
     } else {
       lines.push(`  ${name.padEnd(14)} ✗  ${info.reason || ""}`.trimEnd());
     }
@@ -301,19 +347,41 @@ async function cmdStatus(flags) {
   for (const e of entries.slice(0, 10)) {
     const mark = e.ok ? "✓" : "✗";
     const dur = `${(e.duration_ms / 1000).toFixed(1)}s`;
+    const cost = formatCost(e.cost_usd_estimate);
     process.stdout.write(
-      `${mark} ${e.started_at}  ${e.source}→${e.target}  ${e.role.padEnd(16)} ${dur.padStart(7)}  ${e.ok ? "" : "(" + e.error + ")"}\n`
+      `${mark} ${e.started_at}  ${e.source}→${e.target}  ${e.role.padEnd(16)} ${dur.padStart(7)}  ${cost.padStart(10)}  ${e.ok ? "" : "(" + e.error + ")"}\n`
     );
   }
   return 0;
 }
 
+function formatCost(c) {
+  if (typeof c !== "number" || !Number.isFinite(c) || c <= 0) return "—";
+  return `$${c.toFixed(4)}`;
+}
+
+function parseSince(value) {
+  if (!value) return null;
+  const m = String(value).match(/^(\d+)([smhd])$/);
+  if (!m) return null;
+  const n = Number.parseInt(m[1], 10);
+  const unit = m[2];
+  const mult = unit === "s" ? 1000 : unit === "m" ? 60000 : unit === "h" ? 3600000 : 86400000;
+  return Date.now() - n * mult;
+}
+
 async function cmdHistory(flags) {
   const limit = flags.limit ? Number.parseInt(flags.limit, 10) : 50;
+  const sinceMs = parseSince(flags.since);
+  if (flags.since && sinceMs === null) {
+    process.stderr.write(`chorus: bad --since value '${flags.since}' (expected e.g. 2h, 30m, 7d)\n`);
+    return 2;
+  }
   const filter = (e) =>
     (!flags.source || e.source === flags.source) &&
     (!flags.target || e.target === flags.target) &&
-    (!flags.role || e.role === flags.role);
+    (!flags.role || e.role === flags.role) &&
+    (sinceMs === null || (e.started_at && Date.parse(e.started_at) >= sinceMs));
   const entries = readJobIndex({ limit, filter });
   if (flags.json) {
     process.stdout.write(JSON.stringify(entries, null, 2) + "\n");
@@ -321,8 +389,9 @@ async function cmdHistory(flags) {
   }
   for (const e of entries) {
     const mark = e.ok ? "✓" : "✗";
+    const cost = formatCost(e.cost_usd_estimate);
     process.stdout.write(
-      `${mark} ${e.started_at}  ${e.source}→${e.target}  ${e.role}  ${e.ok ? "" : e.error}\n`
+      `${mark} ${e.started_at}  ${e.source}→${e.target}  ${(e.role || "").padEnd(16)}  ${cost.padStart(10)}  ${e.ok ? "" : e.error}\n`
     );
   }
   return 0;

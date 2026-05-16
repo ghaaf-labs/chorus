@@ -43,6 +43,7 @@ function parsePrompt(textParts) {
 
 export async function runAcpServer({ stdin = process.stdin, stdout = process.stdout, stderr = process.stderr } = {}) {
   const sessions = new Map();
+  const inflight = new Map();
   let nextSessionNum = 1;
 
   function send(obj) {
@@ -96,12 +97,20 @@ export async function runAcpServer({ stdin = process.stdin, stdout = process.std
       }
     });
 
-    const result = await callOne({
-      source: "acp-client",
-      target: parsed.target,
-      role: parsed.role,
-      task: parsed.task
-    });
+    const controller = new AbortController();
+    inflight.set(sessionId, controller);
+    let result;
+    try {
+      result = await callOne({
+        source: "acp-client",
+        target: parsed.target,
+        role: parsed.role,
+        task: parsed.task,
+        abortSignal: controller.signal
+      });
+    } finally {
+      inflight.delete(sessionId);
+    }
 
     const summary = result.ok
       ? JSON.stringify(result.result, null, 2)
@@ -129,8 +138,14 @@ export async function runAcpServer({ stdin = process.stdin, stdout = process.std
     reply(id, { stopReason: result.ok ? "end_turn" : "refusal" });
   }
 
-  async function handleSessionCancel(_params) {
-    // No-op for now: Chorus's callOne does not yet expose cancel.
+  async function handleSessionCancel(params) {
+    const sessionId = params?.sessionId;
+    if (!sessionId) return;
+    const controller = inflight.get(sessionId);
+    if (controller) {
+      controller.abort();
+      stderr.write(`chorus-acp: cancelled in-flight session ${sessionId}\n`);
+    }
   }
 
   async function dispatch(msg) {

@@ -64,8 +64,44 @@ export class JobLogger {
   }
 }
 
+const DEFAULT_ROTATE_BYTES = 50 * 1024 * 1024;
+const DEFAULT_ROTATE_KEEP = 10;
+
+function rotateSizeLimit() {
+  const raw = process.env.CHORUS_JOBS_ROTATE_BYTES;
+  if (!raw) return DEFAULT_ROTATE_BYTES;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_ROTATE_BYTES;
+}
+
+function rotateKeep() {
+  const raw = process.env.CHORUS_JOBS_ROTATE_KEEP;
+  if (!raw) return DEFAULT_ROTATE_KEEP;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_ROTATE_KEEP;
+}
+
+export async function maybeRotateJobIndex({ sizeLimit = rotateSizeLimit(), keep = rotateKeep() } = {}) {
+  const p = jobsIndexPath();
+  if (!fs.existsSync(p)) return { rotated: false };
+  const st = await fsp.stat(p);
+  if (st.size < sizeLimit) return { rotated: false, size: st.size };
+  for (let i = keep - 1; i >= 1; i--) {
+    const src = `${p}.${i}`;
+    const dst = `${p}.${i + 1}`;
+    if (fs.existsSync(src)) {
+      try {
+        await fsp.rename(src, dst);
+      } catch { /* tolerate */ }
+    }
+  }
+  await fsp.rename(p, `${p}.1`);
+  return { rotated: true, size: st.size };
+}
+
 export async function appendJobIndex(entry) {
   await ensureHomeDir();
+  await maybeRotateJobIndex();
   const line = JSON.stringify(entry) + "\n";
   await fsp.appendFile(jobsIndexPath(), line);
 }

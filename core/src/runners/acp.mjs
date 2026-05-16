@@ -48,7 +48,7 @@ export async function getOrStartClient({ target, spec, model, cwd, logger }) {
  * spec: { command, args, env?, prompt }
  * options: { childEnv, timeoutS, logger, target, model, cwd }
  */
-export async function runAcp({ spec, childEnv = {}, timeoutS, logger, target, model, cwd }) {
+export async function runAcp({ spec, childEnv = {}, timeoutS, logger, target, model, cwd, abortSignal }) {
   const startedAt = Date.now();
   let client;
   try {
@@ -73,7 +73,20 @@ export async function runAcp({ spec, childEnv = {}, timeoutS, logger, target, mo
     return { error: "spawn_failed", detail: err.message, durationMs: Date.now() - startedAt };
   }
 
+  let abortHandler;
+  if (abortSignal) {
+    if (abortSignal.aborted) {
+      try { client.cancelSession(sessionId); } catch { /* ignore */ }
+    } else {
+      abortHandler = () => {
+        try { client.cancelSession(sessionId); } catch { /* ignore */ }
+      };
+      abortSignal.addEventListener("abort", abortHandler, { once: true });
+    }
+  }
+
   let timedOut = false;
+  let aborted = false;
   try {
     const result = await client.prompt(sessionId, spec.prompt, {
       timeoutMs: timeoutS * 1000,
@@ -96,8 +109,13 @@ export async function runAcp({ spec, childEnv = {}, timeoutS, logger, target, mo
   } catch (err) {
     if (err?.message === "acp_prompt_timeout") {
       timedOut = true;
+    } else if (err?.message === "acp_prompt_aborted" || abortSignal?.aborted) {
+      aborted = true;
     }
-    logger?.event("acp_prompt_failed", { error: err.message, timed_out: timedOut });
+    logger?.event("acp_prompt_failed", { error: err.message, timed_out: timedOut, aborted });
+    if (aborted) {
+      return { error: "aborted", stderr_excerpt: err.message, durationMs: Date.now() - startedAt };
+    }
     return {
       error: timedOut ? "timeout" : "nonzero_exit",
       timeout_s: timedOut ? timeoutS : undefined,
@@ -105,6 +123,10 @@ export async function runAcp({ spec, childEnv = {}, timeoutS, logger, target, mo
       stderr_excerpt: err.message,
       durationMs: Date.now() - startedAt
     };
+  } finally {
+    if (abortHandler && abortSignal) {
+      try { abortSignal.removeEventListener("abort", abortHandler); } catch { /* ignore */ }
+    }
   }
 }
 

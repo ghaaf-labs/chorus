@@ -1,13 +1,16 @@
 import { spawnSync } from "node:child_process";
+import { bridgeAvailable, CLAUDE_ACP_BRIDGE, CODEX_ACP_BRIDGE } from "./targets/bridges.mjs";
 
 const PROBES = {
   "claude-code": {
     binary: "claude",
-    versionArgs: ["--version"]
+    versionArgs: ["--version"],
+    acpBridge: CLAUDE_ACP_BRIDGE
   },
   codex: {
     binary: "codex",
-    versionArgs: ["--version"]
+    versionArgs: ["--version"],
+    acpBridge: CODEX_ACP_BRIDGE
   },
   grok: {
     binary: "grok",
@@ -35,7 +38,12 @@ function probeBinary(name) {
     return { available: false, reason: res.error.message };
   }
   const version = (res.stdout || res.stderr || "").trim().split("\n")[0];
-  return { available: true, version, binary: probe.binary };
+  const info = { available: true, version, binary: probe.binary };
+  if (probe.acpBridge) {
+    info.acp_bridge = probe.acpBridge;
+    info.acp_bridge_installed = bridgeAvailable(probe.acpBridge);
+  }
+  return info;
 }
 
 export function detectAll() {

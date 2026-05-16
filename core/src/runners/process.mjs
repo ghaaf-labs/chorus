@@ -15,13 +15,14 @@ import { DEFAULTS } from "../budget.mjs";
  *  - { error: "nonzero_exit", exit_code, stderr_excerpt, durationMs }
  *  - { stdout, stderr, exitCode, durationMs, warnings? }
  */
-export async function runSubprocess({ spec, childEnv = {}, timeoutS, logger, stdoutMax = DEFAULTS.stdout_max_bytes }) {
+export async function runSubprocess({ spec, childEnv = {}, timeoutS, logger, stdoutMax = DEFAULTS.stdout_max_bytes, abortSignal }) {
   const startedAt = Date.now();
   let child;
   let stdoutBuf = Buffer.alloc(0);
   let stderrBuf = Buffer.alloc(0);
   let overflowed = false;
   let timedOut = false;
+  let aborted = false;
   let exitCode = null;
   let signalReceived = null;
   let killOutcome = null;
@@ -59,6 +60,20 @@ export async function runSubprocess({ spec, childEnv = {}, timeoutS, logger, std
     triggerKill("timeout");
   }, timeoutS * 1000);
 
+  let abortHandler;
+  if (abortSignal) {
+    if (abortSignal.aborted) {
+      aborted = true;
+      triggerKill("aborted");
+    } else {
+      abortHandler = () => {
+        aborted = true;
+        triggerKill("aborted");
+      };
+      abortSignal.addEventListener("abort", abortHandler, { once: true });
+    }
+  }
+
   child.stdout.on("data", (chunk) => {
     if (overflowed) return;
     if (stdoutBuf.length + chunk.length > stdoutMax) {
@@ -91,6 +106,9 @@ export async function runSubprocess({ spec, childEnv = {}, timeoutS, logger, std
   });
 
   clearTimeout(timer);
+  if (abortHandler && abortSignal) {
+    try { abortSignal.removeEventListener("abort", abortHandler); } catch { /* ignore */ }
+  }
   if (killPromise) {
     await killPromise;
   }
@@ -114,6 +132,14 @@ export async function runSubprocess({ spec, childEnv = {}, timeoutS, logger, std
     ? `process ${child.pid} did not terminate after SIGTERM+SIGKILL — likely escaped the process group via setsid`
     : null;
 
+  if (aborted) {
+    return {
+      error: "aborted",
+      orphaned: Boolean(killOutcome?.orphaned),
+      durationMs,
+      ...(orphanWarning ? { warnings: [orphanWarning] } : {})
+    };
+  }
   if (timedOut) {
     return {
       error: "timeout",

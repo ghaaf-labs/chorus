@@ -55,7 +55,7 @@ export function buildInvocation({ mode, prompt, model }) {
     return {
       command: "opencode",
       args: ["acp", "--pure"],
-      env: {},
+      env: model ? { OPENCODE_MODEL: model } : {},
       prompt
     };
   }

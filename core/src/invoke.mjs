@@ -24,6 +24,7 @@ const DRIVERS = {
 
 const ERROR_HINTS = {
   timeout: "Increase --timeout, or check whether the target is hanging.",
+  aborted: "The call was cancelled by the caller (Ctrl-C, session/cancel, or AbortController.abort()).",
   stdout_overflow: "The target emitted more output than CHORUS_STDOUT_MAX_BYTES allows; the target may be misbehaving.",
   schema_violation: "The target's reply did not match the role's JSON schema. Inspect the .payload.json sidecar in ~/.chorus/logs/ for the raw output.",
   spawn_failed: "Could not start the target binary. Run `chorus doctor` to verify it is installed and authed.",
@@ -61,7 +62,9 @@ export async function callOne({
   maxTokens = DEFAULTS.max_tokens,
   allowSelf = false,
   registry: providedRegistry,
-  mode: requestedMode
+  mode: requestedMode,
+  parentJobId,
+  abortSignal
 } = {}) {
   const preGuards = checkGuards({ source, target: requestedTarget ?? "<auto>", role });
   if (preGuards.blocked) {
@@ -70,6 +73,7 @@ export async function callOne({
       target: requestedTarget ?? null,
       role,
       model,
+      parentJobId,
       error: preGuards.error,
       detail: { depth: preGuards.depth, max_depth: maxDepth(), trace: preGuards.trace ?? [] }
     });
@@ -83,6 +87,7 @@ export async function callOne({
       target: resolved.target ?? requestedTarget ?? null,
       role,
       model,
+      parentJobId,
       error: resolved.error,
       detail: { attempted: resolved.attempted }
     });
@@ -91,7 +96,7 @@ export async function callOne({
   const driver = DRIVERS[target];
   if (!driver) {
     return errorEnvelope({
-      source, target, role, model,
+      source, target, role, model, parentJobId,
       error: "target_not_implemented"
     });
   }
@@ -124,7 +129,8 @@ export async function callOne({
     input_bytes: inputText ? Buffer.byteLength(inputText, "utf8") : 0,
     composed_prompt_bytes: Buffer.byteLength(composed.prompt, "utf8"),
     depth: currentDepth() + 1,
-    schema_id: schemaIdFromRole(role)
+    schema_id: schemaIdFromRole(role),
+    parent_job_id: parentJobId ?? null
   });
 
   let spec;
@@ -141,7 +147,7 @@ export async function callOne({
     logger.event("build_invocation_error", { error: err.message });
     await logger.close();
     return errorEnvelope({
-      source, target, role, model,
+      source, target, role, model, parentJobId,
       error: "unsupported_mode",
       detail: { message: err.message }
     });
@@ -157,20 +163,22 @@ export async function callOne({
       logger,
       target,
       model,
-      cwd: process.cwd()
+      cwd: process.cwd(),
+      abortSignal
     });
   } else if (mode === SUBPROCESS) {
     runResult = await runSubprocess({
       spec,
       childEnv: childExtraEnv,
       timeoutS,
-      logger
+      logger,
+      abortSignal
     });
   } else {
     logger.event("build_invocation_error", { error: `mode ${mode} not implemented` });
     await logger.close();
     return errorEnvelope({
-      source, target, role, model,
+      source, target, role, model, parentJobId,
       error: "unsupported_mode",
       detail: { mode }
     });
@@ -178,6 +186,8 @@ export async function callOne({
 
   const payloadPath = await logger.payloadFile({
     prompt: spec.stdin,
+    task: task ?? null,
+    input_text: inputText ?? null,
     stdout: runResult.stdout ?? "",
     stderr: runResult.stderr ?? ""
   });
@@ -193,7 +203,8 @@ export async function callOne({
     started_at: startedAtIso,
     duration_ms: Date.now() - callStart,
     schema_id: schemaIdFromRole(role),
-    trace_depth: currentDepth() + 1
+    trace_depth: currentDepth() + 1,
+    parent_job_id: parentJobId ?? null
   };
 
   if (runResult.error) {
@@ -280,7 +291,7 @@ function projectErrorDetail(runResult) {
   return out;
 }
 
-function errorEnvelope({ source, target, role, model, error, detail }) {
+function errorEnvelope({ source, target, role, model, error, detail, parentJobId }) {
   return {
     chorus_version: "0.1.0",
     source,
@@ -289,6 +300,7 @@ function errorEnvelope({ source, target, role, model, error, detail }) {
     model: model ?? null,
     schema_id: role ? schemaIdFromRole(role) : null,
     trace_depth: currentDepth() + 1,
+    parent_job_id: parentJobId ?? null,
     ok: false,
     error,
     hint: ERROR_HINTS[error],

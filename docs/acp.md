@@ -13,10 +13,10 @@ Each target driver declares the modes it supports:
 
 | Target | runModes | What gets spawned in ACP mode |
 |---|---|---|
-| `claude-code` | `[subprocess]` (ACP via community bridge planned; see below) | — |
-| `codex` | `[subprocess]` | — |
+| `claude-code` | `[subprocess]` → `[subprocess, acp]` if `claude-code-acp` is on `$PATH` | `claude-code-acp` |
+| `codex` | `[subprocess]` → `[subprocess, acp]` if `codex-acp` is on `$PATH` | `codex-acp` |
 | `grok` | `[acp, subprocess]` | `grok agent stdio` |
-| `opencode` | `[acp, subprocess]` | `opencode acp --pure` |
+| `opencode` | `[acp, subprocess]` | `opencode acp --pure` (model passed via `OPENCODE_MODEL` env) |
 
 When ACP is the first supported mode, `chorus call` prefers it. Force the transport with `--mode subprocess` / `--mode acp` or with env vars `CHORUS_FORCE_MODE`, `CHORUS_DISABLE_ACP=1`.
 
@@ -24,14 +24,28 @@ When ACP is the first supported mode, `chorus call` prefers it. Force the transp
 
 **Process lifecycle.** SIGINT and SIGTERM drain the pool gracefully. Process exit closes whatever's still open.
 
-### Community ACP bridges (optional, for Claude Code + Codex)
+### Community ACP bridges (Claude Code + Codex) — **auto-detected as of M6**
 
-ACP support for Claude and Codex is provided by separate npm packages — install one and Chorus can use it as a target via ACP instead of subprocess:
+Install one or both:
 
-- **Claude Code** — `npm i -g @agentclientprotocol/claude-agent-acp` (or `claude-code-acp` / `acp-claude-code`). Spawn pattern: `claude-code-acp`.
-- **Codex** — `cargo install codex-acp` (Rust) or `npm i -g codex-acp` if you find a JS port. Spawn pattern: `codex-acp`.
+- **Claude Code** — `npm i -g @agentclientprotocol/claude-agent-acp` (provides the `claude-code-acp` binary; alternatives: `acp-claude-code`).
+- **Codex** — `cargo install codex-acp` (Rust) or `npm i -g codex-acp` if you find a JS port. Provides the `codex-acp` binary.
 
-Once one of these is on `$PATH`, you can add a one-line override in your shell config to switch the target driver's ACP command, or extend the driver. We will likely auto-detect these and switch over in M6.
+After install, Chorus auto-detects the bridge at module load (cached for the process lifetime). Verify with:
+
+```bash
+chorus doctor
+# claude-code     ✓  1.0.x   [acp bridge: claude-code-acp ✓]
+# codex           ✓  0.130.0 [acp bridge: codex-acp ✓]
+```
+
+Force ACP for one call:
+
+```bash
+chorus call --target claude-code --mode acp --task "..."
+```
+
+Disable bridge probing (e.g. to debug a misbehaving bridge) with `CHORUS_DISABLE_BRIDGES=1`.
 
 ## As an ACP server (Chorus inside Zed / JetBrains)
 

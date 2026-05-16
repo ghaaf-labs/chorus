@@ -1,9 +1,21 @@
-import { SUBPROCESS } from "./driver.mjs";
+import { SUBPROCESS, ACP } from "./driver.mjs";
+import { bridgeAvailable, CODEX_ACP_BRIDGE } from "./bridges.mjs";
 
 export const id = "codex";
-export const runModes = [SUBPROCESS];
+export const runModes = bridgeAvailable(CODEX_ACP_BRIDGE) ? [SUBPROCESS, ACP] : [SUBPROCESS];
 
 export function buildInvocation({ mode, prompt, model, schemaPath, sandbox = "read-only" }) {
+  if (mode === ACP) {
+    if (!bridgeAvailable(CODEX_ACP_BRIDGE)) {
+      throw new Error(`codex ACP requires the '${CODEX_ACP_BRIDGE}' bridge on $PATH`);
+    }
+    return {
+      command: CODEX_ACP_BRIDGE,
+      args: [],
+      env: model ? { CODEX_MODEL: model } : {},
+      prompt
+    };
+  }
   if (mode !== SUBPROCESS) {
     throw new Error(`codex driver does not support mode "${mode}"`);
   }
@@ -15,11 +27,13 @@ export function buildInvocation({ mode, prompt, model, schemaPath, sandbox = "re
 }
 
 export function extractAssistant(runResult, mode) {
+  if (mode === ACP) return runResult.stdout ?? "";
   if (mode !== SUBPROCESS) throw new Error("unsupported mode");
   return extractAssistantText(runResult.stdout || "");
 }
 
 export function extractTokens(runResult, mode) {
+  if (mode === ACP) return { input: 0, output: 0, total: 0 };
   if (mode !== SUBPROCESS) throw new Error("unsupported mode");
   return extractTokensFromStdout(runResult.stdout || "");
 }
