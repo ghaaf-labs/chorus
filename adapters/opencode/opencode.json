@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "chorus-reviewer": {
+      "description": "Delegate code review to another CLI agent (Codex/Grok/Claude) via Chorus.",
+      "mode": "subagent"
+    },
+    "chorus-researcher": {
+      "description": "Delegate deep research with citations to another CLI agent (default Grok) via Chorus.",
+      "mode": "subagent"
+    },
+    "chorus-architect": {
+      "description": "Delegate architecture candidates to another CLI agent (default Codex) via Chorus.",
+      "mode": "subagent"
+    },
+    "chorus-devils-advocate": {
+      "description": "Delegate adversarial critique to another CLI agent (default Grok) via Chorus.",
+      "mode": "subagent"
+    }
+  }
+}

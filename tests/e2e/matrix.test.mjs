@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CODEX_STUB = path.resolve(here, "..", "mocks", "stub-codex.mjs");
 const CLAUDE_STUB = path.resolve(here, "..", "mocks", "stub-claude.mjs");
+const OPENCODE_STUB = path.resolve(here, "..", "mocks", "stub-opencode.mjs");
 
 const ALL_AVAILABLE = {
   hosts: {
@@ -39,6 +40,17 @@ vi.mock("../../core/src/targets/codex.mjs", async (importActual) => {
   };
 });
 
+vi.mock("../../core/src/targets/opencode.mjs", async (importActual) => {
+  const real = await importActual();
+  return {
+    ...real,
+    buildInvocation: ({ mode, prompt }) => {
+      if (mode !== "subprocess") throw new Error("unsupported mode");
+      return { command: process.execPath, args: [OPENCODE_STUB], stdin: prompt };
+    }
+  };
+});
+
 let tmpLogDir;
 let saved = {};
 
@@ -57,7 +69,7 @@ afterEach(() => {
 });
 
 const HOSTS = ["claude-code", "codex", "grok", "opencode"];
-const WIRED = new Set(["claude-code", "codex"]);
+const WIRED = new Set(["claude-code", "codex", "opencode"]);
 
 // 16 source × target scenarios. M1 wires 4 of them (the 2x2 of {claude-code, codex}).
 // The remaining 12 are .todo until their target drivers land in M2/M3.
