@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chorus.dev/schemas/architect.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["candidates", "recommendation", "open_questions"],
+  "properties": {
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "summary", "components", "data_flow", "tradeoffs", "failure_modes", "first_milestone"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string", "minLength": 1 },
+          "components": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "data_flow": { "type": "string", "minLength": 1 },
+          "tradeoffs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "failure_modes": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "first_milestone": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate", "rationale"],
+      "properties": {
+        "candidate": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

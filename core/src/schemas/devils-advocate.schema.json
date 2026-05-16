@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chorus.dev/schemas/devils-advocate.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["objections", "falsifying_assumptions", "worst_realistic_outcome"],
+  "properties": {
+    "objections": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["thesis", "mechanism", "severity", "evidence_or_reasoning"],
+        "properties": {
+          "thesis": { "type": "string", "minLength": 1 },
+          "mechanism": { "type": "string", "minLength": 1 },
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+          "evidence_or_reasoning": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "falsifying_assumptions": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "worst_realistic_outcome": { "type": "string", "minLength": 1 }
+  }
+}
