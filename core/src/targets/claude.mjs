@@ -1,15 +1,19 @@
+import fs from "node:fs";
 import { SUBPROCESS } from "./driver.mjs";
 
 export const id = "claude-code";
 export const runModes = [SUBPROCESS];
 
-export function buildInvocation({ mode, prompt, model, maxTokens }) {
+export function buildInvocation({ mode, prompt, model, schemaPath }) {
   if (mode !== SUBPROCESS) {
     throw new Error(`claude-code driver does not support mode "${mode}"`);
   }
-  const args = ["-p", "--output-format", "json", "--no-session-persistence"];
+  const args = ["-p", "--no-session-persistence", "--disable-slash-commands", "--output-format", "json"];
+  if (schemaPath) {
+    const schemaText = fs.readFileSync(schemaPath, "utf8");
+    args.push("--json-schema", schemaText);
+  }
   if (model) args.push("--model", model);
-  if (maxTokens) args.push("--max-tokens", String(maxTokens));
   return { command: "claude", args, stdin: prompt };
 }
 

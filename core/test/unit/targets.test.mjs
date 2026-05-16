@@ -13,9 +13,10 @@ describe("targets/claude driver shape", () => {
     const s = claude.buildInvocation({ mode: SUBPROCESS, prompt: "hi", model: "claude-sonnet-4-7" });
     expect(s.command).toBe("claude");
     expect(s.args).toContain("-p");
+    expect(s.args).toContain("--no-session-persistence");
+    expect(s.args).toContain("--disable-slash-commands");
     expect(s.args).toContain("--output-format");
     expect(s.args).toContain("json");
-    expect(s.args).toContain("--no-session-persistence");
     expect(s.args).toContain("--model");
     expect(s.args).toContain("claude-sonnet-4-7");
     expect(s.stdin).toBe("hi");
@@ -24,6 +25,16 @@ describe("targets/claude driver shape", () => {
   it("omits --model when not passed", () => {
     const s = claude.buildInvocation({ mode: SUBPROCESS, prompt: "hi" });
     expect(s.args).not.toContain("--model");
+  });
+
+  it("inlines the schema text via --json-schema when schemaPath is given", () => {
+    const schemaPath = new URL("../../src/schemas/reviewer.schema.json", import.meta.url).pathname;
+    const s = claude.buildInvocation({ mode: SUBPROCESS, prompt: "hi", schemaPath });
+    expect(s.args).toContain("--json-schema");
+    const idx = s.args.indexOf("--json-schema");
+    const schemaArg = s.args[idx + 1];
+    expect(schemaArg).toContain("verdict");
+    expect(schemaArg).toContain("findings");
   });
 
   it("buildInvocation throws on unsupported mode", () => {

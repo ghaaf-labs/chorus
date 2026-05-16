@@ -1,0 +1,16 @@
+{
+  "description": "Refresh Chorus capability registry on Codex session start if older than 24h.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CODEX_PLUGIN_ROOT}/../../bin/chorus\" setup --quiet || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
