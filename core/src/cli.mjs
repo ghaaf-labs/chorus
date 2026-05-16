@@ -6,15 +6,17 @@ import { readJobIndex } from "./logging.mjs";
 import { ROLE_NAMES, pickDefaultRole } from "./roles/defaults.mjs";
 import { findJobById, loadJobPayload } from "./replay.mjs";
 import { translateModel } from "./model-map.mjs";
+import { buildLineage, renderAscii, renderMermaid, lineageStats } from "./lineage.mjs";
 
 const USAGE = `chorus — multi-CLI agent collaboration
 
 usage:
   chorus call --target <name> --role <name> --task "<text>" [opts]
-  chorus council --role <name> --targets a,b,c --task "<text>" [opts]
+  chorus council --role <name> --targets a,b,c --task "<text>" [--quorum K-of-N] [--force] [opts]
   chorus benchmark [--role <name>] [--task "<text>"] [--targets a,b,c] [--json]
   chorus replay <job_id> [--target <name>] [--role <name>] [--source <name>] [--model <id>]
   chorus canary check [--limit N] [--json]
+  chorus lineage <job_id> [--json] [--mermaid]
   chorus acp                      start ACP server on stdio (for Zed/JetBrains/etc)
   chorus setup [--refresh-stale <hours>]
   chorus doctor
@@ -28,6 +30,7 @@ call/council options:
   --model <id>                override default model
   --mode acp|subprocess       transport (default: target's first supported mode)
   --redact                    strip emails/PATs/secrets before send (also CHORUS_REDACT=1)
+  --parent <id>[,<id>...]     explicitly link new job to prior job_id(s) for lineage
   --timeout <seconds>         wall-clock timeout (default 300)
   --max-tokens <n>            output token budget (default 60000)
   --source <name>             override caller-host name (default "cli")
@@ -64,6 +67,8 @@ export async function main(argv) {
       return cmdReplay(parseFlags(rest));
     case "canary":
       return cmdCanary(parseFlags(rest));
+    case "lineage":
+      return cmdLineage(parseFlags(rest));
     case "acp":
       return cmdAcp();
     case "setup":
@@ -145,6 +150,10 @@ async function cmdCall(flags) {
     return 2;
   }
 
+  const parentJobIds = flags.parent
+    ? String(flags.parent).split(",").map((s) => s.trim()).filter(Boolean)
+    : undefined;
+
   const result = await callOne({
     source: flags.source ?? "cli",
     target: flags.target,
@@ -156,7 +165,8 @@ async function cmdCall(flags) {
     maxTokens,
     allowSelf: Boolean(flags["allow-self"]),
     mode: flags.mode,
-    redact: Boolean(flags.redact)
+    redact: Boolean(flags.redact),
+    parentJobIds
   });
 
   emit(result, flags["output-format"] ?? "json");
@@ -192,7 +202,9 @@ async function cmdCouncil(flags) {
     task: flags.task,
     inputText,
     model: flags.model,
-    timeoutS: councilTimeoutS
+    timeoutS: councilTimeoutS,
+    quorum: flags.quorum,
+    force: Boolean(flags.force)
   });
 
   emit(result, flags["output-format"] ?? "json");
@@ -338,6 +350,31 @@ async function cmdCanary(flags) {
     process.stdout.write(`  ✗ ${b.file}  →  ${tokens}\n`);
   }
   return 1;
+}
+
+async function cmdLineage(flags) {
+  const jobId = flags._?.[0];
+  if (!jobId) {
+    process.stderr.write("usage: chorus lineage <job_id> [--json] [--mermaid]\n");
+    return 2;
+  }
+  const tree = buildLineage(jobId);
+  if (tree.missing && Object.keys(tree).length <= 2) {
+    process.stderr.write(`chorus: no job found with id '${jobId}'\n`);
+    return 2;
+  }
+  if (flags.json) {
+    process.stdout.write(JSON.stringify({ ...tree, stats: lineageStats(tree) }, null, 2) + "\n");
+    return 0;
+  }
+  if (flags.mermaid) {
+    process.stdout.write(renderMermaid(tree));
+    return 0;
+  }
+  const stats = lineageStats(tree);
+  process.stdout.write(`chorus lineage — depth ${stats.depth}, max width ${stats.width}\n\n`);
+  process.stdout.write(renderAscii(tree));
+  return 0;
 }
 
 async function cmdAcp() {
