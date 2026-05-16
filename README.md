@@ -48,9 +48,16 @@ A Pro + Plus + SuperGrok Lite bundle (~$60/mo combined) covers the full 4×4 mes
 
 Chorus is not a third-party harness — it shells out to each vendor's own binary, so the third-party-OAuth ban Anthropic enforced in April 2026 does not apply.
 
+## ACP (Agent Client Protocol)
+
+Chorus speaks ACP in both directions:
+
+- **As a client** — Grok and OpenCode get called over ACP natively (long-lived sessions, no per-call cold start). Claude Code and Codex stay on subprocess until you install their community ACP bridges. See `docs/acp.md`.
+- **As a server** — `chorus acp` exposes Chorus itself as a single ACP agent. Install once in Zed or a JetBrains IDE and access the full 4×4 mesh through one connection. Route between targets with `@grok`, `@codex`, `@claude-code`, `@opencode` directives, or pin a role with `@reviewer`, `@architect`, `@researcher`, `@devils-advocate`.
+
 ## Status
 
-v0.1 in development. Full 4×4 mesh live (M0 through M4). See `docs/architecture.md` for the milestone plan and `docs/subscriptions.md` for the auth strategy.
+v0.1 in development. Full 4×4 mesh live (M0 through M5). Native ACP transport for Grok+OpenCode, Chorus-as-ACP-server for Zed/JetBrains integration. See `docs/architecture.md` for the milestone plan, `docs/subscriptions.md` for the auth strategy, and `docs/acp.md` for the ACP integration.
 
 ## License
 

@@ -22,6 +22,7 @@ call/council options:
   --task "<text>"             task description (required)
   --input-file <path>         attach file contents as <input>
   --model <id>                override default model
+  --mode acp|subprocess       transport (default: target's first supported mode)
   --timeout <seconds>         wall-clock timeout (default 300)
   --max-tokens <n>            output token budget (default 60000)
   --source <name>             override caller-host name (default "cli")
@@ -140,7 +141,8 @@ async function cmdCall(flags) {
     model: flags.model,
     timeoutS,
     maxTokens,
-    allowSelf: Boolean(flags["allow-self"])
+    allowSelf: Boolean(flags["allow-self"]),
+    mode: flags.mode
   });
 
   emit(result, flags["output-format"] ?? "json");
