@@ -1,6 +1,7 @@
 # Chorus observability
 
-Chorus writes structured JSONL traces for every call. Nothing about a call is hidden — but nothing is leaked back to the caller's context window either.
+Chorus writes local job traces for every call. Nothing about a call is hidden on
+disk, and raw target output is not leaked back to the caller's context window.
 
 ## Where things live
 
@@ -14,7 +15,8 @@ Chorus writes structured JSONL traces for every call. Nothing about a call is hi
     └── …
 ```
 
-When `chorus` runs from inside a clone of this repo (i.e. `CHORUS_REPO_ROOT` is set), logs go to `<repo>/.logs/` instead of `~/.chorus/logs/`. This makes it easier to inspect during development without polluting your home directory.
+When `CHORUS_REPO_ROOT` is set, logs go to `<repo>/.logs/` instead of
+`~/.chorus/logs/`. The installed CLI does not set this variable by default.
 
 ## `jobs.jsonl`
 
@@ -79,6 +81,13 @@ chorus benchmark --role devils-advocate --task "argue against X" --json
 ```
 
 `chorus benchmark` is your friend after a vendor CLI upgrade. Run it, eyeball the duration/cost columns, look for regressions. The default benchmark task is the smallest possible researcher question so the absolute numbers are dominated by per-call fixed cost — useful for tracking that floor as Chorus evolves.
+
+## OTel
+
+Set `CHORUS_OTEL_FILE` to write span-shaped JSONL. Set
+`CHORUS_OTEL_ENDPOINT` to send OTLP/HTTP JSON to a collector. See
+`docs/telemetry.md` for the zero-by-default posture and
+`docs/observability-setup.md` for collector examples.
 
 ## Tailing live work
 

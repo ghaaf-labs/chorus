@@ -3,7 +3,12 @@ node_modules/
 *.payload.json
 .DS_Store
 coverage/
-dist/
+dist/*
+!dist/install.sh
+!dist/Formula/
+!dist/Formula/chorus.rb
+!dist/scoop/
+!dist/scoop/chorus.json
 .env
 .env.local
 *.tgz

@@ -15,7 +15,7 @@ let tmpHome;
 function chorus(args, env = {}) {
   return spawnSync(BIN, args, {
     encoding: "utf8",
-    env: { ...process.env, HOME: tmpHome, ...env },
+    env: { ...process.env, HOME: tmpHome, CHORUS_PROBE_TIMEOUT_MS: "500", ...env },
     timeout: 15000
   });
 }
@@ -44,7 +44,7 @@ describe("chorus binary baseline", () => {
   it("`chorus help` lists the M7-M11.5 subcommands", () => {
     const r = chorus(["help"]);
     expect(r.status).toBe(0);
-    for (const cmd of ["lineage", "playbook", "regress", "bulk-query", "dedup", "mcp", "trust", "drift", "canary"]) {
+    for (const cmd of ["lineage", "playbook", "regress", "bulk-query", "dedup", "mcp", "trust", "drift", "canary", "init"]) {
       expect(r.stdout).toContain(cmd);
     }
   });
@@ -206,5 +206,14 @@ describe("chorus doctor (no registry)", () => {
     // doctor either prints capability lines or shows targets as not_installed
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("chorus 0.1.0 — capability registry");
+  });
+});
+
+describe("chorus init", () => {
+  it("creates a budget template with --yes", () => {
+    const r = chorus(["init", "--yes", "--skip-probe"]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("chorus init");
+    expect(fs.existsSync(path.join(tmpHome, ".chorus", "budget.json"))).toBe(true);
   });
 });

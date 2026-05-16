@@ -342,7 +342,7 @@ export async function callOne({
   });
   recordSpend(cost);
 
-  emitSpan({
+  await emitSpan({
     name: `chorus.call.${role}`,
     traceId: traceCtx.trace_id,
     spanId: traceCtx.span_id,
@@ -359,7 +359,15 @@ export async function callOne({
       "chorus.tokens.output": tokens.output,
       "chorus.tokens.total": tokens.total,
       "chorus.tokens.estimated": Boolean(tokens.estimated),
-      "chorus.cost_usd": cost
+      "chorus.cost_usd": cost,
+      "gen_ai.system": target,
+      "gen_ai.operation.name": "chat",
+      "gen_ai.request.model": model ?? "",
+      "gen_ai.response.model": model ?? "",
+      "gen_ai.usage.input_tokens": tokens.input,
+      "gen_ai.usage.output_tokens": tokens.output,
+      "gen_ai.usage.total_tokens": tokens.total,
+      "gen_ai.usage.cost": cost
     },
     status: "OK"
   });

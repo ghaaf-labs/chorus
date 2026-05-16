@@ -10,7 +10,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { readJobIndex } from "./logging.mjs";
-import { CANARY_TOKENS, scanForBreaches } from "./canary.mjs";
+import { scanForBreaches } from "./canary.mjs";
 import { loadPlaybook } from "./playbook.mjs";
 
 function trustDir() {

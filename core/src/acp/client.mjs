@@ -165,7 +165,7 @@ export class AcpClient extends EventEmitter {
   async prompt(sessionId, text, { onUpdate, timeoutMs } = {}) {
     let assistantText = "";
     let thoughts = "";
-    let toolCalls = [];
+    const toolCalls = [];
 
     const updateListener = (params) => {
       if (params?.sessionId !== sessionId) return;

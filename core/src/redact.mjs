@@ -47,6 +47,20 @@ const PATTERNS = [
   },
   { type: "github_pat", re: /\b(ghp|gho|ghs|ghu|ghr)_[A-Za-z0-9_]{36,}\b/g },
   { type: "aws_key", re: /\b(AKIA|ASIA)[0-9A-Z]{16}\b/g },
+  // Anthropic keys MUST come before generic OpenAI sk- pattern so the
+  // longer/more specific prefix wins. (Order in this array determines
+  // application order in redactText.)
+  { type: "anthropic_key", re: /\bsk-ant-(?:api\d{2}-)?[A-Za-z0-9_-]{32,}\b/g },
+  // OpenAI keys (legacy sk-… + project-scoped sk-proj-… and 2026 sk_live_/sk_test_)
+  { type: "openai_key", re: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/g },
+  { type: "openai_key_live", re: /\bsk_(?:live|test)_[A-Za-z0-9]{24,}\b/g },
+  // Google API key (AIza + 35 chars; the \b makes 35 a hard lower bound but
+  // length is canonical for Google Cloud API keys)
+  { type: "google_api_key", re: /\bAIza[0-9A-Za-z_-]{35,}\b/g },
+  // Slack tokens
+  { type: "slack_token", re: /\bxox[abprs]-[A-Za-z0-9-]{10,}\b/g },
+  // Generic JWT (header.payload.signature)
+  { type: "jwt", re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g },
   {
     type: "private_ip",
     re: /\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|127\.\d{1,3}\.\d{1,3}\.\d{1,3})\b/g

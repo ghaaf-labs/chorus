@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "generated_from": "714ed19-plus-m12-production-readiness",
+  "verdicts": {
+    "canary-review-001": "needs-attention",
+    "canary-review-002": "needs-attention",
+    "canary-review-003": "approve",
+    "canary-research-001": "approve",
+    "canary-research-002": "approve",
+    "canary-architect-001": "approve",
+    "canary-architect-002": "needs-attention",
+    "canary-devils-001": "needs-attention",
+    "canary-retriever-001": "approve",
+    "canary-judge-001": "approve",
+    "canary-test-001": "approve",
+    "canary-bisect-001": "approve",
+    "canary-profiler-001": "approve",
+    "canary-refactor-001": "approve",
+    "canary-safety-001": "needs-attention",
+    "swe-pro-001": "needs-attention",
+    "swe-pro-002": "approve",
+    "swe-pro-003": "approve",
+    "swe-pro-004": "approve",
+    "swe-pro-005": "needs-attention"
+  }
+}

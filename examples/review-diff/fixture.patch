@@ -1,0 +1,13 @@
+diff --git a/server.js b/server.js
+index 1111111..2222222 100644
+--- a/server.js
++++ b/server.js
+@@ -1,6 +1,7 @@
+ export function handler(req, res) {
+-  const token = process.env.API_TOKEN;
++  const token = req.query.token || process.env.API_TOKEN;
+   if (!token) return res.status(401).send("missing token");
+   res.setHeader("cache-control", "no-store");
++  console.log("token", token);
+   return res.send("ok");
+ }

@@ -64,14 +64,16 @@ vi.mock("../../core/src/targets/grok.mjs", async (importActual) => {
 });
 
 let tmpLogDir;
-let saved = {};
+const saved = {};
 
 beforeEach(() => {
   tmpLogDir = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-matrix-"));
   saved.CHORUS_REPO_ROOT = process.env.CHORUS_REPO_ROOT;
   saved.CHORUS_FORCE_MODE = process.env.CHORUS_FORCE_MODE;
+  saved.CHORUS_BUDGET_PATH = process.env.CHORUS_BUDGET_PATH;
   process.env.CHORUS_REPO_ROOT = tmpLogDir;
   process.env.CHORUS_FORCE_MODE = "subprocess";
+  process.env.CHORUS_BUDGET_PATH = path.join(tmpLogDir, "budget.json");
   process.env.CHORUS_STUB_MODE = "ok";
 });
 
@@ -80,6 +82,8 @@ afterEach(() => {
   else process.env.CHORUS_REPO_ROOT = saved.CHORUS_REPO_ROOT;
   if (saved.CHORUS_FORCE_MODE === undefined) delete process.env.CHORUS_FORCE_MODE;
   else process.env.CHORUS_FORCE_MODE = saved.CHORUS_FORCE_MODE;
+  if (saved.CHORUS_BUDGET_PATH === undefined) delete process.env.CHORUS_BUDGET_PATH;
+  else process.env.CHORUS_BUDGET_PATH = saved.CHORUS_BUDGET_PATH;
   delete process.env.CHORUS_STUB_MODE;
   try { fs.rmSync(tmpLogDir, { recursive: true, force: true }); } catch { /* ignore */ }
 });
@@ -87,8 +91,7 @@ afterEach(() => {
 const HOSTS = ["claude-code", "codex", "grok", "opencode"];
 const WIRED = new Set(["claude-code", "codex", "opencode", "grok"]);
 
-// 16 source × target scenarios. M1 wires 4 of them (the 2x2 of {claude-code, codex}).
-// The remaining 12 are .todo until their target drivers land in M2/M3.
+// Stubbed caller × target scenarios for the original four host adapters.
 const scenarios = [];
 for (const source of HOSTS) {
   for (const target of HOSTS) {
@@ -96,7 +99,7 @@ for (const source of HOSTS) {
   }
 }
 
-describe("4×4 cross-CLI smoke matrix (stubbed)", () => {
+describe("cross-CLI smoke matrix (stubbed)", () => {
   for (const { source, target } of scenarios) {
     const live = WIRED.has(target);
     const allowSelf = source === target;

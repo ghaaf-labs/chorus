@@ -1,22 +1,47 @@
 {
   "name": "@chorus/cli",
-  "version": "0.1.0-dev",
-  "description": "Multi-CLI agent collaboration toolkit. Lets Claude Code, OpenAI Codex CLI, xAI Grok CLI, and OpenCode call each other for review, research, planning, and adversarial critique without poisoning the calling agent's context.",
+  "version": "0.1.0",
+  "description": "Multi-CLI agent collaboration toolkit. Lets Claude Code, OpenAI Codex CLI, xAI Grok CLI, OpenCode, Grok Build, GitHub Copilot CLI, and a peer Knowledge-Index RAG call each other for review, research, planning, and adversarial critique — without poisoning the calling agent's context.",
   "type": "module",
+  "sideEffects": false,
   "bin": {
-    "chorus": "./bin/chorus",
-    "chorus-core": "./core/bin/chorus-core.mjs"
+    "chorus": "bin/chorus",
+    "chorus-core": "core/bin/chorus-core.mjs"
   },
   "exports": {
     ".": "./core/src/cli.mjs"
   },
+  "files": [
+    "bin/",
+    "core/bin/",
+    "core/src/",
+    "adapters/",
+    "roles/",
+    "scripts/",
+    "shared/",
+    "docs/",
+    "examples/",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "SECURITY.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:unit": "vitest run core/test/unit",
     "test:e2e:stub": "vitest run tests/e2e",
     "test:e2e:live": "CHORUS_E2E_LIVE=1 vitest run tests/e2e",
-    "lint": "eslint . --ext .mjs,.js",
-    "prepack": "node scripts/postpack.mjs",
+    "eval:check": "node scripts/build-eval-baseline.mjs",
+    "lint": "eslint . --max-warnings=0",
+    "prepack": "node scripts/materialize-symlinks.mjs",
     "postpack": "node scripts/restore-symlinks.mjs"
   },
   "dependencies": {
@@ -24,25 +49,39 @@
     "ajv-formats": "^3.0.1"
   },
   "devDependencies": {
-    "vitest": "^2.1.0"
+    "@eslint/js": "^9.16.0",
+    "@vitest/coverage-v8": "^4.1.6",
+    "eslint": "^9.16.0",
+    "globals": "^15.14.0",
+    "vitest": "^4.1.6"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.14"
   },
   "license": "Apache-2.0",
-  "homepage": "https://github.com/ghaaf/chorus",
+  "homepage": "https://github.com/ghaaf-labs/chorus",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ghaaf/chorus.git"
+    "url": "git+https://github.com/ghaaf-labs/chorus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ghaaf-labs/chorus/issues"
   },
   "keywords": [
     "claude-code",
     "codex",
     "grok",
     "opencode",
+    "grok-build",
+    "copilot-cli",
     "multi-agent",
     "agent-orchestration",
+    "acp",
+    "agent-client-protocol",
     "mcp",
-    "ai-agents"
+    "ai-agents",
+    "rag",
+    "trust",
+    "canary"
   ]
 }

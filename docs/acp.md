@@ -5,7 +5,7 @@
 Chorus speaks ACP in two directions:
 
 1. **As an ACP client** — Chorus's per-target driver can speak ACP to any agent that exposes a stdio ACP server (Grok and OpenCode natively; Claude Code and Codex via community bridges). Long-lived sessions, streaming, no per-call cold start after warmup.
-2. **As an ACP server** — `chorus acp` exposes Chorus itself as a single ACP agent that internally orchestrates the four CLIs. Editors / IDEs that speak ACP can install Chorus and get the whole mesh through one connection.
+2. **As an ACP server** — `chorus acp` exposes Chorus itself as a single ACP agent that internally orchestrates the supported target mesh. Editors / IDEs that speak ACP can install Chorus and get the whole mesh through one connection.
 
 ## As an ACP client (transport for targets)
 
@@ -17,6 +17,9 @@ Each target driver declares the modes it supports:
 | `codex` | `[subprocess]` → `[subprocess, acp]` if `codex-acp` is on `$PATH` | `codex-acp` |
 | `grok` | `[acp, subprocess]` | `grok agent stdio` |
 | `opencode` | `[acp, subprocess]` | `opencode acp --pure` (model passed via `OPENCODE_MODEL` env) |
+| `grok-build` | `[subprocess]` | n/a |
+| `copilot` | `[subprocess]` | n/a |
+| `knowledge` | `[subprocess]` | n/a |
 
 When ACP is the first supported mode, `chorus call` prefers it. Force the transport with `--mode subprocess` / `--mode acp` or with env vars `CHORUS_FORCE_MODE`, `CHORUS_DISABLE_ACP=1`.
 

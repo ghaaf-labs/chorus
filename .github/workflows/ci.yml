@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: ['22.14', '24']
+    runs-on: ${{ matrix.os }}
+    name: test (${{ matrix.os }} / node ${{ matrix.node }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify lockfile signatures (supply-chain)
+        run: npm audit signatures
+
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.os }}-node-${{ matrix.node }}
+          path: coverage/
+          if-no-files-found: error
+
+      - name: Pack dry-run (ensures `files` field is correct)
+        run: npm pack --dry-run
+
+  smoke:
+    needs: test
+    runs-on: ubuntu-latest
+    name: smoke (binary boots, help, version)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: chorus version
+        run: ./bin/chorus version
+      - name: chorus help
+        run: ./bin/chorus help
+      - name: chorus canary check (clean history)
+        run: |
+          mkdir -p $HOME/.chorus
+          ./bin/chorus canary check
+      - name: chorus trust --ci (clean history)
+        run: ./bin/chorus trust --ci

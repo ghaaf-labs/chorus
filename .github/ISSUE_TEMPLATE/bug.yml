@@ -1,0 +1,39 @@
+name: Bug report
+description: Report a reproducible Chorus defect
+title: "[bug]: "
+labels: ["Bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Chorus version
+      description: Output of `chorus version`
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Doctor output
+      description: Paste `chorus doctor --deep` output. Redact local paths or account names if needed.
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Commands, input files, and expected vs actual behavior.
+      render: shell
+    validations:
+      required: true

@@ -41,13 +41,17 @@ function probeBinary(name) {
   const res = spawnSync(probe.binary, probe.versionArgs, {
     encoding: "utf8",
     stdio: "pipe",
-    timeout: 5000
+    timeout: Number.parseInt(process.env.CHORUS_PROBE_TIMEOUT_MS ?? "5000", 10)
   });
   if (res.error && res.error.code === "ENOENT") {
     return { available: false, reason: "not_installed" };
   }
   if (res.status !== 0 && res.error) {
     return { available: false, reason: res.error.message };
+  }
+  if (res.status !== 0) {
+    const reason = (res.stderr || res.stdout || `exit_${res.status}`).trim().split("\n")[0];
+    return { available: false, reason };
   }
   const version = (res.stdout || res.stderr || "").trim().split("\n")[0];
   const info = { available: true, version, binary: probe.binary };

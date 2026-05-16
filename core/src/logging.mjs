@@ -24,7 +24,7 @@ export function jobsIndexPath() {
 }
 
 async function ensureHomeDir() {
-  await fsp.mkdir(homeDir(), { recursive: true });
+  await fsp.mkdir(homeDir(), { recursive: true, mode: 0o700 });
 }
 
 export function generateJobId() {
@@ -34,7 +34,7 @@ export function generateJobId() {
 }
 
 export function newJobLogPath({ source, target, role, jobId }) {
-  fs.mkdirSync(logsDir(), { recursive: true });
+  fs.mkdirSync(logsDir(), { recursive: true, mode: 0o700 });
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
   return path.join(logsDir(), `${ts}-${source}-${target}-${role}-${jobId}.jsonl`);
 }
