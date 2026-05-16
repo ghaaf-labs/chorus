@@ -11,6 +11,7 @@ usage:
   chorus call --target <name> --role <name> --task "<text>" [opts]
   chorus council --role <name> --targets a,b,c --task "<text>" [opts]
   chorus benchmark [--role <name>] [--task "<text>"] [--targets a,b,c] [--json]
+  chorus acp                      start ACP server on stdio (for Zed/JetBrains/etc)
   chorus setup [--refresh-stale <hours>]
   chorus doctor
   chorus status [--json]
@@ -53,6 +54,8 @@ export async function main(argv) {
       return cmdCouncil(parseFlags(rest));
     case "benchmark":
       return cmdBenchmark(parseFlags(rest));
+    case "acp":
+      return cmdAcp();
     case "setup":
       return cmdSetup(parseFlags(rest));
     case "doctor":
@@ -248,6 +251,12 @@ async function cmdBenchmark(flags) {
     );
   }
   process.stdout.write("\n");
+  return 0;
+}
+
+async function cmdAcp() {
+  const { runAcpServer } = await import("./acp/server.mjs");
+  await runAcpServer();
   return 0;
 }
 
