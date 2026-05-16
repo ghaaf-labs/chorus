@@ -3,22 +3,28 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-const HOME_DIR = path.join(os.homedir(), ".chorus");
-const REPO_LOG_DIR = process.env.CHORUS_REPO_ROOT
-  ? path.join(process.env.CHORUS_REPO_ROOT, ".logs")
-  : null;
+function homeDir() {
+  return path.join(os.homedir(), ".chorus");
+}
+
+function repoLogDir() {
+  return process.env.CHORUS_REPO_ROOT
+    ? path.join(process.env.CHORUS_REPO_ROOT, ".logs")
+    : null;
+}
 
 export function logsDir() {
-  if (REPO_LOG_DIR) return REPO_LOG_DIR;
-  return path.join(HOME_DIR, "logs");
+  const r = repoLogDir();
+  if (r) return r;
+  return path.join(homeDir(), "logs");
 }
 
 export function jobsIndexPath() {
-  return path.join(HOME_DIR, "jobs.jsonl");
+  return path.join(homeDir(), "jobs.jsonl");
 }
 
 async function ensureHomeDir() {
-  await fsp.mkdir(HOME_DIR, { recursive: true });
+  await fsp.mkdir(homeDir(), { recursive: true });
 }
 
 export function generateJobId() {

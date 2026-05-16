@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chorus.dev/schemas/profiler.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "summary", "bottlenecks"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["approve", "needs-attention", "inconclusive"]
+    },
+    "summary": { "type": "string", "minLength": 1 },
+    "bottlenecks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["site", "class", "expected_impact_pct", "first_attempt"],
+        "properties": {
+          "site": { "type": "string", "minLength": 1 },
+          "class": {
+            "type": "string",
+            "enum": ["cpu", "memory", "io", "lock", "algorithmic-complexity"]
+          },
+          "expected_impact_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+          "first_attempt": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

@@ -3,12 +3,13 @@ import { jobsIndexPath } from "./logging.mjs";
 
 function jobIndexFiles() {
   const main = jobsIndexPath();
-  if (!fs.existsSync(main)) return [];
-  const files = [main];
+  const files = [];
+  if (fs.existsSync(main)) files.push(main);
   for (let i = 1; i <= 32; i++) {
     const rot = `${main}.${i}`;
     if (fs.existsSync(rot)) files.push(rot);
-    else break;
+    else if (files.length === 0 && i === 1) continue; // main missing, .1 missing → keep probing
+    else if (!fs.existsSync(rot)) break;
   }
   return files;
 }

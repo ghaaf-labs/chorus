@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chorus.dev/schemas/test-writer.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "summary", "cases"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["approve", "needs-attention", "inconclusive"]
+    },
+    "summary": { "type": "string", "minLength": 1 },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["describe", "it", "arrange", "act", "assert"],
+        "properties": {
+          "describe": { "type": "string", "minLength": 1 },
+          "it": { "type": "string", "minLength": 1 },
+          "arrange": { "type": "string", "minLength": 1 },
+          "act": { "type": "string", "minLength": 1 },
+          "assert": { "type": "string", "minLength": 1 },
+          "boundary": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

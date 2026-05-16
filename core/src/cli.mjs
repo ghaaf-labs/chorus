@@ -17,6 +17,11 @@ usage:
   chorus replay <job_id> [--target <name>] [--role <name>] [--source <name>] [--model <id>]
   chorus canary check [--limit N] [--json]
   chorus lineage <job_id> [--json] [--mermaid]
+  chorus playbook [rebuild|show] [--role <name>] [--json]
+  chorus regress --since <since> [--target <name>] [--limit N]
+  chorus bulk-query --file tasks.jsonl [--role <name>] [--target <name>]
+  chorus dedup [--task "..."] [--window-days N] [--threshold 0..1]
+  chorus mcp                      experimental: MCP server stub
   chorus acp                      start ACP server on stdio (for Zed/JetBrains/etc)
   chorus setup [--refresh-stale <hours>]
   chorus doctor [--deep]
@@ -72,6 +77,16 @@ export async function main(argv) {
       return cmdCanary(parseFlags(rest));
     case "lineage":
       return cmdLineage(parseFlags(rest));
+    case "playbook":
+      return cmdPlaybook(parseFlags(rest));
+    case "regress":
+      return cmdRegress(parseFlags(rest));
+    case "bulk-query":
+      return cmdBulkQuery(parseFlags(rest));
+    case "dedup":
+      return cmdDedup(parseFlags(rest));
+    case "mcp":
+      return cmdMcp();
     case "acp":
       return cmdAcp();
     case "setup":
@@ -445,6 +460,126 @@ async function cmdCanary(flags) {
     process.stdout.write(`  ✗ ${b.file}  →  ${tokens}\n`);
   }
   return 1;
+}
+
+async function cmdPlaybook(flags) {
+  const { buildPlaybook, savePlaybook, loadPlaybook } = await import("./playbook.mjs");
+  const sub = flags._?.[0] ?? "show";
+  if (sub === "rebuild") {
+    const pb = buildPlaybook();
+    const p = savePlaybook(pb);
+    process.stdout.write(`chorus playbook: wrote ${Object.keys(pb.roles).length} roles to ${p}\n`);
+    if (flags.json) process.stdout.write(JSON.stringify(pb, null, 2) + "\n");
+    return 0;
+  }
+  const pb = loadPlaybook();
+  if (!pb) {
+    process.stderr.write("chorus playbook: no playbook yet — run `chorus playbook rebuild`\n");
+    return 2;
+  }
+  if (flags.json) {
+    process.stdout.write(JSON.stringify(pb, null, 2) + "\n");
+    return 0;
+  }
+  process.stdout.write(`chorus playbook — generated ${pb.generated_at}\n\n`);
+  for (const [role, ranked] of Object.entries(pb.roles)) {
+    if (flags.role && flags.role !== role) continue;
+    process.stdout.write(`${role}:\n`);
+    for (const r of ranked.slice(0, 6)) {
+      process.stdout.write(`  ${r.target.padEnd(14)} ${r.success_rate.toFixed(2).padStart(5)} ${String(r.samples).padStart(5)} samples\n`);
+    }
+  }
+  return 0;
+}
+
+async function cmdRegress(flags) {
+  if (!flags.since) {
+    process.stderr.write("usage: chorus regress --since <7d|24h|...> [--target X] [--limit N]\n");
+    return 2;
+  }
+  const sinceMs = parseSince(flags.since);
+  if (sinceMs === null) {
+    process.stderr.write(`chorus: bad --since '${flags.since}'\n`);
+    return 2;
+  }
+  const limit = flags.limit ? Number.parseInt(flags.limit, 10) : 20;
+  const filter = (e) =>
+    e.ok && e.started_at && Date.parse(e.started_at) >= sinceMs &&
+    (!flags.target || e.target === flags.target);
+  const entries = readJobIndex({ limit: 10000, filter }).slice(0, limit);
+  process.stdout.write(`chorus regress: re-running ${entries.length} jobs\n\n`);
+  let drift = 0;
+  for (const e of entries) {
+    const payload = e.log_path ? (await import("./replay.mjs")).loadJobPayload(e.log_path) : null;
+    if (!payload?.task) continue;
+    const r = await callOne({
+      source: "regress",
+      target: e.target,
+      role: e.role,
+      task: payload.task,
+      timeoutS: 120,
+      allowSelf: true,
+      parentJobIds: [e.job_id]
+    });
+    const oldVerdict = (await import("./replay.mjs")).findJobById(e.job_id);
+    const verdictNow = r.result?.verdict ?? r.ok;
+    const drifted = r.ok !== e.ok ? true : false;
+    if (drifted) drift++;
+    process.stdout.write(`  ${drifted ? "Δ" : " "} ${e.job_id} → ${r.job_id}  ${e.target}  ${e.ok ? "ok→" : "fail→"}${r.ok ? "ok" : "fail"}  verdict=${verdictNow}\n`);
+  }
+  process.stdout.write(`\ndrifted: ${drift}/${entries.length}\n`);
+  return 0;
+}
+
+async function cmdBulkQuery(flags) {
+  if (!flags.file) {
+    process.stderr.write("usage: chorus bulk-query --file <tasks.jsonl> [--role X] [--target Y]\n");
+    return 2;
+  }
+  const raw = fs.readFileSync(flags.file, "utf8");
+  const tasks = raw.split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l));
+  process.stderr.write(`[chorus bulk-query: ${tasks.length} tasks]\n`);
+  const results = await Promise.all(tasks.map((t) => callOne({
+    source: "bulk",
+    target: t.target ?? flags.target,
+    role: t.role ?? flags.role,
+    task: t.task,
+    inputText: t.input,
+    timeoutS: 180,
+    allowSelf: true
+  })));
+  process.stdout.write(JSON.stringify({ count: results.length, results }, null, 2) + "\n");
+  return results.every((r) => r.ok) ? 0 : 1;
+}
+
+async function cmdDedup(flags) {
+  const { findNearDuplicate } = await import("./dedup.mjs");
+  const task = flags.task || "";
+  if (!task) {
+    process.stderr.write("usage: chorus dedup --task \"<text>\" [--window-days N] [--threshold 0..1]\n");
+    return 2;
+  }
+  const windowDays = flags["window-days"] ? Number.parseInt(flags["window-days"], 10) : 90;
+  const threshold = flags.threshold ? Number.parseFloat(flags.threshold) : 0.7;
+  const hit = findNearDuplicate(task, { windowDays, threshold });
+  if (!hit) {
+    process.stdout.write(`chorus dedup: no near-duplicate found (window=${windowDays}d, threshold=${threshold})\n`);
+    return 0;
+  }
+  process.stdout.write(`chorus dedup: NEAR-DUPLICATE (Jaccard=${hit.similarity.toFixed(2)})\n`);
+  process.stdout.write(`  prior job: ${hit.job_id}\n`);
+  process.stdout.write(`  ran:       ${hit.started_at}\n`);
+  process.stdout.write(`  target:    ${hit.target}\n`);
+  process.stdout.write(`  role:      ${hit.role}\n`);
+  process.stdout.write(`  task:      ${hit.prior_task.slice(0, 200)}${hit.prior_task.length > 200 ? "…" : ""}\n`);
+  process.stdout.write(`use chorus replay ${hit.job_id} to view the prior result; pass --force to override.\n`);
+  return 0;
+}
+
+async function cmdMcp() {
+  process.stderr.write("chorus mcp: server-stub placeholder (M11 base shipped; full MCP 2025-11-25 transport in a later milestone)\n");
+  process.stderr.write("for ACP-equivalent functionality use `chorus acp`.\n");
+  return 0;
 }
 
 async function cmdLineage(flags) {

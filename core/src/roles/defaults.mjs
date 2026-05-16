@@ -13,7 +13,10 @@ const ROLE_FALLBACKS = {
   "devils-advocate": ["grok-build", "grok", "codex", "claude-code", "opencode"],
   retriever: ["knowledge"],
   judge: ["claude-code", "codex", "grok-build", "grok", "opencode"],
-  "refactor-scribe": ["copilot", "codex", "claude-code", "opencode"]
+  "refactor-scribe": ["copilot", "codex", "claude-code", "opencode"],
+  "test-writer": ["codex", "claude-code", "copilot", "grok-build", "opencode"],
+  bisector: ["codex", "claude-code", "grok-build", "opencode"],
+  profiler: ["codex", "claude-code", "grok-build", "opencode"]
 };
 
 export const ROLE_NAMES = Object.keys(ROLE_FALLBACKS);
