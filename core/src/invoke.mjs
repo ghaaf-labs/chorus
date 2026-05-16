@@ -334,7 +334,12 @@ export async function callOne({
   logger.event("validated", { fields_truncated: validation.fields_truncated });
   await logger.close();
 
-  await appendJobIndex({ ...withCost, ok: true, log_path: logPath });
+  await appendJobIndex({
+    ...withCost,
+    ok: true,
+    verdict: validation.result?.verdict ?? null,
+    log_path: logPath
+  });
   recordSpend(cost);
 
   emitSpan({

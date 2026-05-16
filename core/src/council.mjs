@@ -20,6 +20,37 @@ export async function callCouncil({
   if (!Array.isArray(targets) || targets.length === 0) {
     return { ok: false, error: "no_targets" };
   }
+  // Codex review (HIGH): duplicate targets would let one host's vote be
+  // counted N times and trivially satisfy quorum. Dedupe up front while
+  // preserving order.
+  const seenT = new Set();
+  const dedupedTargets = [];
+  for (const t of targets) {
+    if (!seenT.has(t)) { seenT.add(t); dedupedTargets.push(t); }
+  }
+  if (dedupedTargets.length < targets.length) {
+    // Caller passed dupes; we silently dedupe but flag a warning.
+  }
+  targets = dedupedTargets;
+
+  // Validate quorum spec: must be K-of-N with 1 <= K <= N <= targets.length.
+  let quorumNeed = null;
+  let quorumOf = targets.length;
+  if (quorum) {
+    const m = String(quorum).match(/^(\d+)-of-(\d+)$/);
+    if (!m) {
+      return { ok: false, error: "bad_quorum", hint: `quorum '${quorum}' is not in K-of-N form` };
+    }
+    quorumNeed = Number.parseInt(m[1], 10);
+    quorumOf = Number.parseInt(m[2], 10);
+    if (quorumNeed < 1 || quorumOf < 1 || quorumNeed > quorumOf || quorumOf > targets.length) {
+      return {
+        ok: false,
+        error: "bad_quorum",
+        hint: `quorum '${quorum}' invalid: need 1<=K<=N and N<=${targets.length} (distinct targets)`
+      };
+    }
+  }
 
   const shape = shouldRefuseCouncil(task, { force });
   if (shape.refuse) {
@@ -61,8 +92,13 @@ export async function callCouncil({
     error: r.ok ? null : r.error
   }));
 
+  // Coerce + validate vote_weight: must be a finite positive number; else 1.0.
   const weights = Object.fromEntries(
-    targets.map((t) => [t, registry?.hosts?.[t]?.vote_weight ?? 1.0])
+    targets.map((t) => {
+      const raw = registry?.hosts?.[t]?.vote_weight;
+      const n = typeof raw === "number" && Number.isFinite(raw) && raw > 0 ? raw : 1.0;
+      return [t, n];
+    })
   );
 
   const verdictWeights = {};
@@ -79,14 +115,10 @@ export async function callCouncil({
 
   let quorumOk = true;
   let quorumDetail = null;
-  if (quorum) {
-    const m = String(quorum).match(/^(\d+)-of-(\d+)$/);
-    if (m) {
-      const need = Number.parseInt(m[1], 10);
-      const okCount = participants.filter((p) => p.ok && p.verdict === consensus).length;
-      quorumOk = okCount >= need;
-      quorumDetail = { need, got: okCount, of: participants.length };
-    }
+  if (quorumNeed !== null) {
+    const okCount = participants.filter((p) => p.ok && p.verdict === consensus).length;
+    quorumOk = okCount >= quorumNeed;
+    quorumDetail = { need: quorumNeed, got: okCount, of: participants.length };
   }
 
   const dissent = results
@@ -137,13 +169,14 @@ export async function callCouncil({
 }
 
 function pickConsensus(verdictWeights) {
-  const entries = Object.entries(verdictWeights);
+  const entries = Object.entries(verdictWeights)
+    .filter(([, w]) => typeof w === "number" && Number.isFinite(w));
   if (!entries.length) return null;
   entries.sort(([va, wa], [vb, wb]) => {
     if (wb !== wa) return wb - wa;
     return VERDICT_PRIORITY.indexOf(va) - VERDICT_PRIORITY.indexOf(vb);
   });
-  // Tie at top weight → null (no consensus)
-  if (entries.length > 1 && entries[0][1] === entries[1][1]) return null;
+  // Tie at top weight (within float tolerance) → null (no consensus).
+  if (entries.length > 1 && Math.abs(entries[0][1] - entries[1][1]) < 1e-9) return null;
   return entries[0][0];
 }

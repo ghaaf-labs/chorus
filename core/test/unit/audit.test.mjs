@@ -33,6 +33,178 @@ afterEach(() => {
   try { fs.rmSync(tmpHome, { recursive: true, force: true }); } catch { /* ignore */ }
 });
 
+describe("council.mjs codex-review fixes: dedupe targets + quorum validation + weight coercion", () => {
+  it("dedupes duplicate council targets up front (vote amplification fix)", async () => {
+    const inv = await import("../../src/invoke.mjs");
+    const seen = [];
+    vi.spyOn(inv, "callOne").mockImplementation(async ({ target }) => {
+      seen.push(target);
+      return { job_id: `j-${target}-${seen.length}`, ok: true, target, result: { verdict: "approve" } };
+    });
+    const { callCouncil } = await import("../../src/council.mjs");
+    const r = await callCouncil({
+      source: "test",
+      targets: ["codex", "codex", "codex", "grok"],
+      role: "reviewer",
+      task: "review independent diff"
+    });
+    expect(r.participants).toHaveLength(2); // deduped to codex + grok
+    expect(seen).toEqual(["codex", "grok"]); // callOne invoked exactly once per unique target
+    vi.restoreAllMocks();
+  });
+
+  it("rejects malformed quorum spec with bad_quorum error", async () => {
+    const { callCouncil } = await import("../../src/council.mjs");
+    const r1 = await callCouncil({
+      source: "test", targets: ["codex", "grok"], role: "reviewer",
+      task: "review independent diff", quorum: "garbage"
+    });
+    expect(r1.error).toBe("bad_quorum");
+    const r2 = await callCouncil({
+      source: "test", targets: ["codex", "grok"], role: "reviewer",
+      task: "review independent diff", quorum: "0-of-0"
+    });
+    expect(r2.error).toBe("bad_quorum");
+    const r3 = await callCouncil({
+      source: "test", targets: ["codex", "grok"], role: "reviewer",
+      task: "review independent diff", quorum: "5-of-2"
+    });
+    expect(r3.error).toBe("bad_quorum");
+    const r4 = await callCouncil({
+      source: "test", targets: ["codex", "grok"], role: "reviewer",
+      task: "review independent diff", quorum: "3-of-2"
+    });
+    expect(r4.error).toBe("bad_quorum");
+  });
+
+  it("coerces NaN/Infinity/string vote_weight to 1.0", async () => {
+    const inv = await import("../../src/invoke.mjs");
+    vi.spyOn(inv, "callOne").mockImplementation(async ({ target }) => ({
+      job_id: `j-${target}`, ok: true, target,
+      result: { verdict: target === "codex" ? "approve" : "needs-attention" }
+    }));
+    const { callCouncil } = await import("../../src/council.mjs");
+    const registry = {
+      hosts: {
+        codex: { available: true, vote_weight: Number.NaN },
+        grok: { available: true, vote_weight: "10" }, // string — invalid
+        opencode: { available: true, vote_weight: Infinity }
+      }
+    };
+    const r = await callCouncil({
+      source: "test",
+      targets: ["codex", "grok", "opencode"],
+      role: "reviewer",
+      task: "review independent diff",
+      registry
+    });
+    // All weights coerce to 1.0 → "needs-attention" wins 2-vs-1.
+    expect(r.consensus).toBe("needs-attention");
+    expect(r.consensus_weight).toBe(2);
+    vi.restoreAllMocks();
+  });
+});
+
+describe("moa.parseMoaSpec codex-review hardening", () => {
+  it("rejects sparse layer specs (l2 without l1)", async () => {
+    const { parseMoaSpec } = await import("../../src/moa.mjs");
+    expect(parseMoaSpec("l2=grok")).toBeNull();
+    expect(parseMoaSpec("l1=codex; l3=grok")).toBeNull();
+  });
+
+  it("rejects l0 and negative layer indices", async () => {
+    const { parseMoaSpec } = await import("../../src/moa.mjs");
+    expect(parseMoaSpec("l0=codex")).toBeNull();
+  });
+
+  it("rejects duplicate layer indices", async () => {
+    const { parseMoaSpec } = await import("../../src/moa.mjs");
+    expect(parseMoaSpec("l1=codex; l1=grok")).toBeNull();
+  });
+});
+
+describe("moa.runMoa codex-review fix: per-target isolation via allSettled", () => {
+  it("one rejected callOne doesn't sink the whole layer", async () => {
+    const inv = await import("../../src/invoke.mjs");
+    vi.spyOn(inv, "callOne").mockImplementation(async ({ target }) => {
+      if (target === "broken") throw new Error("synthetic boom");
+      return { job_id: `j-${target}`, ok: true, target, result: { verdict: "approve" } };
+    });
+    const { runMoa } = await import("../../src/moa.mjs");
+    const r = await runMoa({
+      layers: [["broken", "codex"], ["grok"]],
+      source: "test", role: "researcher", task: "what is 2+2"
+    });
+    // Layer 1 had one rejection but layer 2 still ran.
+    expect(r.layers_count).toBe(2);
+    expect(r.final_layer).toHaveLength(1);
+    vi.restoreAllMocks();
+  });
+});
+
+describe("trust.detectVerdictDrift codex-review fix: verdict-only flips + pair dedupe", () => {
+  it("flags verdict flip even when ok is unchanged", async () => {
+    const { appendJobIndex } = await import("../../src/logging.mjs");
+    await appendJobIndex({
+      job_id: "v-p", source: "cli", target: "codex", role: "reviewer",
+      ok: true, verdict: "approve",
+      started_at: new Date(Date.now() - 60000).toISOString(),
+      duration_ms: 100, parent_job_ids: []
+    });
+    await appendJobIndex({
+      job_id: "v-c", source: "regress", target: "codex", role: "reviewer",
+      ok: true, verdict: "needs-attention", // same ok, different verdict
+      started_at: new Date().toISOString(),
+      duration_ms: 100, parent_job_ids: ["v-p"]
+    });
+    const { detectVerdictDrift } = await import("../../src/trust.mjs");
+    const drift = detectVerdictDrift();
+    expect(drift).toHaveLength(1);
+    expect(drift[0].kind).toBe("verdict");
+    expect(drift[0].before.verdict).toBe("approve");
+    expect(drift[0].after.verdict).toBe("needs-attention");
+  });
+
+  it("dedupes the same parent→child pair if listed twice", async () => {
+    const { appendJobIndex } = await import("../../src/logging.mjs");
+    await appendJobIndex({
+      job_id: "d-p", source: "cli", target: "codex", role: "reviewer",
+      ok: true, verdict: "approve",
+      started_at: new Date(Date.now() - 60000).toISOString(),
+      duration_ms: 100, parent_job_ids: []
+    });
+    await appendJobIndex({
+      job_id: "d-c", source: "regress", target: "codex", role: "reviewer",
+      ok: false, verdict: "needs-attention",
+      started_at: new Date().toISOString(),
+      duration_ms: 100, parent_job_ids: ["d-p", "d-p"] // duplicate parent ref
+    });
+    const { detectVerdictDrift } = await import("../../src/trust.mjs");
+    const drift = detectVerdictDrift();
+    expect(drift).toHaveLength(1);
+  });
+});
+
+describe("trust.listBreachesInJobs codex-review fix: surface unreadable sidecars", () => {
+  it("attaches _unreadable list for malformed payload JSON instead of silent skip", async () => {
+    const { appendJobIndex, newJobLogPath } = await import("../../src/logging.mjs");
+    const logPath = newJobLogPath({ source: "test", target: "codex", role: "reviewer", jobId: "bad-side" });
+    fs.writeFileSync(logPath, "");
+    // Write malformed JSON in the sidecar
+    fs.writeFileSync(logPath.replace(/\.jsonl$/, ".payload.json"), "not-json{");
+    await appendJobIndex({
+      job_id: "bad-side", source: "test", target: "codex", role: "reviewer",
+      ok: true, duration_ms: 1, started_at: new Date().toISOString(),
+      parent_job_ids: [], log_path: logPath
+    });
+    const { listBreachesInJobs } = await import("../../src/trust.mjs");
+    const breaches = listBreachesInJobs();
+    expect(Array.isArray(breaches._unreadable)).toBe(true);
+    expect(breaches._unreadable.length).toBe(1);
+    expect(breaches._unreadable[0].job_id).toBe("bad-side");
+  });
+});
+
 describe("council.mjs vote_weight + dedup + drift gap fills", () => {
   it("applies custom vote_weight from registry when summing verdicts", async () => {
     const inv = await import("../../src/invoke.mjs");
