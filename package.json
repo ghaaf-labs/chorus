@@ -15,7 +15,9 @@
     "test:unit": "vitest run core/test/unit",
     "test:e2e:stub": "vitest run tests/e2e",
     "test:e2e:live": "CHORUS_E2E_LIVE=1 vitest run tests/e2e",
-    "lint": "eslint . --ext .mjs,.js"
+    "lint": "eslint . --ext .mjs,.js",
+    "prepack": "node scripts/postpack.mjs",
+    "postpack": "node scripts/restore-symlinks.mjs"
   },
   "dependencies": {
     "ajv": "^8.17.1",

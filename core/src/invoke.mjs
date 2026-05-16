@@ -162,7 +162,7 @@ export async function callOne({
     logger
   });
 
-  const payloadPath = logger.payloadFile({
+  const payloadPath = await logger.payloadFile({
     prompt: spec.stdin,
     stdout: runResult.stdout ?? "",
     stderr: runResult.stderr ?? ""
@@ -184,7 +184,7 @@ export async function callOne({
 
   if (runResult.error) {
     await logger.close();
-    appendJobIndex({ ...baseFields, ok: false, error: runResult.error, log_path: logPath });
+    await appendJobIndex({ ...baseFields, ok: false, error: runResult.error, log_path: logPath });
     return {
       ...baseFields,
       ok: false,
@@ -199,7 +199,7 @@ export async function callOne({
   logger.event("extracted", { assistant_chars: assistantText.length, tokens });
 
   const schema = JSON.parse(fs.readFileSync(composed.schemaPath, "utf8"));
-  const validation = validateAndTrim({ raw: assistantText, schema });
+  const validation = await validateAndTrim({ raw: assistantText, schema });
   const cost = estimateCostUsd({ model, tokens });
   const withCost = { ...baseFields, tokens, cost_usd_estimate: round6(cost) };
 
@@ -207,7 +207,7 @@ export async function callOne({
     logger.event("validation_failed", { reason: validation.reason });
     await logger.close();
     const summarized = summarizeValidatorErrors(validation.validator_errors);
-    appendJobIndex({ ...withCost, ok: false, error: "schema_violation", log_path: logPath });
+    await appendJobIndex({ ...withCost, ok: false, error: "schema_violation", log_path: logPath });
     return {
       ...withCost,
       ok: false,
@@ -222,7 +222,7 @@ export async function callOne({
   logger.event("validated", { fields_truncated: validation.fields_truncated });
   await logger.close();
 
-  appendJobIndex({ ...withCost, ok: true, log_path: logPath });
+  await appendJobIndex({ ...withCost, ok: true, log_path: logPath });
 
   return {
     ...withCost,
@@ -241,6 +241,10 @@ function projectErrorDetail(runResult) {
   if (runResult.exit_code !== undefined) out.exit_code = runResult.exit_code;
   if (runResult.stderr_excerpt !== undefined) out.stderr_excerpt = runResult.stderr_excerpt;
   if (runResult.detail !== undefined) out.detail = runResult.detail;
+  if (runResult.orphaned) out.orphaned = true;
+  if (Array.isArray(runResult.warnings) && runResult.warnings.length) {
+    out.warnings = runResult.warnings;
+  }
   return out;
 }
 

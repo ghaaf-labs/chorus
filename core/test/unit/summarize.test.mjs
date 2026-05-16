@@ -30,8 +30,8 @@ describe("summarize.extractJsonObject", () => {
 });
 
 describe("summarize.validateAndTrim", () => {
-  it("accepts a valid object and returns ok", () => {
-    const r = validateAndTrim({
+  it("accepts a valid object and returns ok", async () => {
+    const r = await validateAndTrim({
       raw: '{"verdict":"approve","summary":"all good"}',
       schema: SCHEMA
     });
@@ -39,8 +39,8 @@ describe("summarize.validateAndTrim", () => {
     expect(r.result.verdict).toBe("approve");
   });
 
-  it("rejects an object that violates schema", () => {
-    const r = validateAndTrim({
+  it("rejects an object that violates schema", async () => {
+    const r = await validateAndTrim({
       raw: '{"verdict":"maybe","summary":"hmm"}',
       schema: SCHEMA
     });
@@ -49,8 +49,8 @@ describe("summarize.validateAndTrim", () => {
     expect(r.reason).toBe("schema_invalid");
   });
 
-  it("rejects unparseable raw text", () => {
-    const r = validateAndTrim({
+  it("rejects unparseable raw text", async () => {
+    const r = await validateAndTrim({
       raw: "not json at all",
       schema: SCHEMA
     });
@@ -59,8 +59,8 @@ describe("summarize.validateAndTrim", () => {
     expect(r.reason).toBe("could_not_parse_json");
   });
 
-  it("truncates long string fields", () => {
-    const r = validateAndTrim({
+  it("truncates long string fields", async () => {
+    const r = await validateAndTrim({
       raw: JSON.stringify({ verdict: "approve", summary: "x".repeat(20_000) }),
       schema: SCHEMA,
       maxChars: 1000

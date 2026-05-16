@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { terminateProcessTree } from "../process.mjs";
+import { terminateProcessTreeWithEscalation } from "../process.mjs";
 import { DEFAULTS } from "../budget.mjs";
 
 /**
@@ -10,10 +10,10 @@ import { DEFAULTS } from "../budget.mjs";
  *
  * Returns one of:
  *  - { error: "spawn_failed", detail }
- *  - { error: "timeout", timeout_s }
- *  - { error: "stdout_overflow", limit_bytes }
- *  - { error: "nonzero_exit", exit_code, stderr_excerpt }
- *  - { stdout, stderr, exitCode, durationMs }
+ *  - { error: "timeout", timeout_s, orphaned?, durationMs }
+ *  - { error: "stdout_overflow", limit_bytes, orphaned?, durationMs }
+ *  - { error: "nonzero_exit", exit_code, stderr_excerpt, durationMs }
+ *  - { stdout, stderr, exitCode, durationMs, warnings? }
  */
 export async function runSubprocess({ spec, childEnv = {}, timeoutS, logger, stdoutMax = DEFAULTS.stdout_max_bytes }) {
   const startedAt = Date.now();
@@ -24,6 +24,8 @@ export async function runSubprocess({ spec, childEnv = {}, timeoutS, logger, std
   let timedOut = false;
   let exitCode = null;
   let signalReceived = null;
+  let killOutcome = null;
+  let killPromise = null;
 
   try {
     child = spawn(spec.command, spec.args, {
@@ -38,16 +40,30 @@ export async function runSubprocess({ spec, childEnv = {}, timeoutS, logger, std
 
   logger?.event("spawn", { pid: child.pid, command: spec.command, args: spec.args });
 
+  function triggerKill(reason) {
+    if (killPromise) return killPromise;
+    killPromise = terminateProcessTreeWithEscalation(child.pid)
+      .then((outcome) => {
+        killOutcome = { ...outcome, reason };
+        logger?.event("kill", killOutcome);
+      })
+      .catch((err) => {
+        killOutcome = { error: err.message, reason };
+        logger?.event("kill_error", killOutcome);
+      });
+    return killPromise;
+  }
+
   const timer = setTimeout(() => {
     timedOut = true;
-    terminateProcessTree(child.pid);
+    triggerKill("timeout");
   }, timeoutS * 1000);
 
   child.stdout.on("data", (chunk) => {
     if (overflowed) return;
     if (stdoutBuf.length + chunk.length > stdoutMax) {
       overflowed = true;
-      terminateProcessTree(child.pid);
+      triggerKill("stdout_overflow");
       return;
     }
     stdoutBuf = Buffer.concat([stdoutBuf, chunk]);
@@ -75,6 +91,9 @@ export async function runSubprocess({ spec, childEnv = {}, timeoutS, logger, std
   });
 
   clearTimeout(timer);
+  if (killPromise) {
+    await killPromise;
+  }
 
   const stdout = stdoutBuf.toString("utf8");
   const stderr = stderrBuf.toString("utf8");
@@ -87,11 +106,32 @@ export async function runSubprocess({ spec, childEnv = {}, timeoutS, logger, std
     stderr_bytes: stderrBuf.length,
     duration_ms: durationMs,
     timed_out: timedOut,
-    overflowed
+    overflowed,
+    kill_outcome: killOutcome
   });
 
-  if (timedOut) return { error: "timeout", timeout_s: timeoutS, durationMs };
-  if (overflowed) return { error: "stdout_overflow", limit_bytes: stdoutMax, durationMs };
+  const orphanWarning = killOutcome?.orphaned
+    ? `process ${child.pid} did not terminate after SIGTERM+SIGKILL — likely escaped the process group via setsid`
+    : null;
+
+  if (timedOut) {
+    return {
+      error: "timeout",
+      timeout_s: timeoutS,
+      orphaned: Boolean(killOutcome?.orphaned),
+      durationMs,
+      ...(orphanWarning ? { warnings: [orphanWarning] } : {})
+    };
+  }
+  if (overflowed) {
+    return {
+      error: "stdout_overflow",
+      limit_bytes: stdoutMax,
+      orphaned: Boolean(killOutcome?.orphaned),
+      durationMs,
+      ...(orphanWarning ? { warnings: [orphanWarning] } : {})
+    };
+  }
   if (exitCode !== 0) {
     return {
       error: "nonzero_exit",

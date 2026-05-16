@@ -1,15 +1,23 @@
-import Ajv2020 from "ajv/dist/2020.js";
-import addFormats from "ajv-formats";
 import { truncateDeep, DEFAULTS } from "./budget.mjs";
 
-const ajv = new Ajv2020({ allErrors: true, strict: false });
-addFormats(ajv);
-
+let ajvInstance = null;
 const validatorCache = new Map();
 
-function getValidator(schema) {
+async function getAjv() {
+  if (ajvInstance) return ajvInstance;
+  const [{ default: Ajv2020 }, { default: addFormats }] = await Promise.all([
+    import("ajv/dist/2020.js"),
+    import("ajv-formats")
+  ]);
+  ajvInstance = new Ajv2020({ allErrors: true, strict: false });
+  addFormats(ajvInstance);
+  return ajvInstance;
+}
+
+async function getValidator(schema) {
   const key = schema.$id || JSON.stringify(schema).slice(0, 64);
   if (!validatorCache.has(key)) {
+    const ajv = await getAjv();
     validatorCache.set(key, ajv.compile(schema));
   }
   return validatorCache.get(key);
@@ -45,7 +53,7 @@ export function extractJsonObject(text) {
   return null;
 }
 
-export function validateAndTrim({ raw, schema, maxChars = DEFAULTS.summary_max_chars }) {
+export async function validateAndTrim({ raw, schema, maxChars = DEFAULTS.summary_max_chars }) {
   const parsed = extractJsonObject(raw);
   if (parsed === null) {
     return {
@@ -55,7 +63,7 @@ export function validateAndTrim({ raw, schema, maxChars = DEFAULTS.summary_max_c
       raw_excerpt: typeof raw === "string" ? raw.slice(0, 2048) : ""
     };
   }
-  const validate = getValidator(schema);
+  const validate = await getValidator(schema);
   if (!validate(parsed)) {
     return {
       ok: false,

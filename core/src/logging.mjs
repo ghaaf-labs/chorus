@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -13,8 +14,11 @@ export function logsDir() {
 }
 
 export function jobsIndexPath() {
-  fs.mkdirSync(HOME_DIR, { recursive: true });
   return path.join(HOME_DIR, "jobs.jsonl");
+}
+
+async function ensureHomeDir() {
+  await fsp.mkdir(HOME_DIR, { recursive: true });
 }
 
 export function generateJobId() {
@@ -29,10 +33,16 @@ export function newJobLogPath({ source, target, role, jobId }) {
   return path.join(logsDir(), `${ts}-${source}-${target}-${role}-${jobId}.jsonl`);
 }
 
+/**
+ * Async, non-blocking job logger. Writes go through a streaming sink so the
+ * event loop never stalls during council fan-out. Callers must `await close()`
+ * before relying on logs being flushed.
+ */
 export class JobLogger {
   constructor(logPath) {
     this.logPath = logPath;
     this.stream = fs.createWriteStream(logPath, { flags: "a" });
+    this._pending = [];
   }
 
   event(event, payload = {}) {
@@ -40,20 +50,24 @@ export class JobLogger {
     this.stream.write(line);
   }
 
-  payloadFile(content) {
+  async payloadFile(content) {
     const p = this.logPath.replace(/\.jsonl$/, ".payload.json");
-    fs.writeFileSync(p, JSON.stringify(content, null, 2), { mode: 0o600 });
+    const task = fsp.writeFile(p, JSON.stringify(content, null, 2), { mode: 0o600 });
+    this._pending.push(task);
+    await task;
     return p;
   }
 
-  close() {
+  async close() {
+    await Promise.allSettled(this._pending);
     return new Promise((r) => this.stream.end(r));
   }
 }
 
-export function appendJobIndex(entry) {
+export async function appendJobIndex(entry) {
+  await ensureHomeDir();
   const line = JSON.stringify(entry) + "\n";
-  fs.appendFileSync(jobsIndexPath(), line);
+  await fsp.appendFile(jobsIndexPath(), line);
 }
 
 export function readJobIndex({ limit = 50, filter } = {}) {

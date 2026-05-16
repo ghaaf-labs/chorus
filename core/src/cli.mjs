@@ -10,6 +10,7 @@ const USAGE = `chorus — multi-CLI agent collaboration
 usage:
   chorus call --target <name> --role <name> --task "<text>" [opts]
   chorus council --role <name> --targets a,b,c --task "<text>" [opts]
+  chorus benchmark [--role <name>] [--task "<text>"] [--targets a,b,c] [--json]
   chorus setup [--refresh-stale <hours>]
   chorus doctor
   chorus status [--json]
@@ -50,6 +51,8 @@ export async function main(argv) {
       return cmdCall(parseFlags(rest));
     case "council":
       return cmdCouncil(parseFlags(rest));
+    case "benchmark":
+      return cmdBenchmark(parseFlags(rest));
     case "setup":
       return cmdSetup(parseFlags(rest));
     case "doctor":
@@ -175,6 +178,77 @@ async function cmdCouncil(flags) {
 
   emit(result, flags["output-format"] ?? "json");
   return result.ok ? 0 : 1;
+}
+
+const BENCHMARK_MODELS = {
+  "claude-code": "sonnet",
+  codex: "gpt-5.4-mini",
+  grok: undefined,
+  opencode: "opencode/claude-haiku-4-5"
+};
+
+const DEFAULT_BENCHMARK_TASK =
+  "What does the SQL statement SELECT 1+1 return? Answer in one sentence with a single source citation.";
+
+async function cmdBenchmark(flags) {
+  const role = flags.role || "researcher";
+  const task = flags.task || DEFAULT_BENCHMARK_TASK;
+  const registry = loadOrRefresh();
+  const requested = flags.targets
+    ? String(flags.targets).split(",").map((s) => s.trim()).filter(Boolean)
+    : Object.keys(registry.hosts || {});
+  const targets = requested.filter((t) => registry.hosts?.[t]?.available);
+
+  if (!targets.length) {
+    process.stderr.write("no available targets — run `chorus setup` or `chorus doctor`\n");
+    return 2;
+  }
+
+  const results = [];
+  for (const target of targets) {
+    const start = Date.now();
+    const r = await callOne({
+      source: "benchmark",
+      target,
+      role,
+      task,
+      model: BENCHMARK_MODELS[target],
+      timeoutS: 120,
+      allowSelf: true,
+      registry
+    });
+    results.push({
+      target,
+      model: r.model ?? BENCHMARK_MODELS[target] ?? "default",
+      ok: r.ok,
+      duration_ms: r.duration_ms ?? (Date.now() - start),
+      tokens: r.tokens ?? { input: 0, output: 0, total: 0 },
+      cost_usd_estimate: r.cost_usd_estimate ?? 0,
+      error: r.ok ? null : r.error
+    });
+  }
+
+  if (flags.json) {
+    process.stdout.write(JSON.stringify({ role, task, results }, null, 2) + "\n");
+    return 0;
+  }
+
+  process.stdout.write(`\nchorus benchmark — role=${role}\n`);
+  process.stdout.write(`task: ${task.slice(0, 80)}${task.length > 80 ? "…" : ""}\n\n`);
+  const header = `${"target".padEnd(13)} ${"model".padEnd(32)} ${"duration".padStart(10)} ${"tokens".padStart(10)} ${"cost USD".padStart(10)}  result`;
+  process.stdout.write(header + "\n");
+  process.stdout.write("-".repeat(header.length) + "\n");
+  for (const r of results) {
+    const dur = `${(r.duration_ms / 1000).toFixed(1)}s`;
+    const toks = `${r.tokens.total}`;
+    const cost = r.cost_usd_estimate ? `$${r.cost_usd_estimate.toFixed(4)}` : "—";
+    const status = r.ok ? "✓" : `✗ ${r.error}`;
+    process.stdout.write(
+      `${r.target.padEnd(13)} ${(r.model || "—").padEnd(32)} ${dur.padStart(10)} ${toks.padStart(10)} ${cost.padStart(10)}  ${status}\n`
+    );
+  }
+  process.stdout.write("\n");
+  return 0;
 }
 
 async function cmdSetup(flags) {
