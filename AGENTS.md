@@ -10,15 +10,17 @@ Standalone repo, nested inside the ghaaf workspace. Layout:
 - `roles/` — canonical role system prompts (one markdown file per role).
 - `shared/` — host-neutral agents, commands, skills. Symlinked into each adapter.
 - `adapters/{claude,codex,grok,opencode}/` — per-host plugin packages.
-- `scripts/` — build/maintenance scripts (`sync-shared.mjs`, `postpack.mjs`).
+- `scripts/` — build/maintenance scripts (`materialize-symlinks.mjs`, `restore-symlinks.mjs`).
 - `tests/`, `docs/`.
 
-Edit role prompts in `roles/`, not in adapters. Adapters use filesystem symlinks for `shared/*`. The `postpack.mjs` script replaces symlinks with file copies at npm-publish time.
+Edit role prompts in `roles/`, not in adapters. Adapters use filesystem
+symlinks for `shared/*`. The `materialize-symlinks.mjs` prepack script
+replaces symlinks with file copies at npm-publish time.
 
 ## Conventions
 
 - Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`).
-- Node 20+, ESM only (`type: module`). No CommonJS.
+- Node 22.14+, ESM only (`type: module`). No CommonJS.
 - No comments unless the *why* is non-obvious. Identifier names carry the *what*.
 - All target invocations go through `core/src/invoke.mjs`. Never spawn a CLI directly from a target adapter — the adapter only builds argv + stdin envelope.
 - Schema-validate every result. Truncate string fields > `CHORUS_SUMMARY_MAX_CHARS`. Never return raw subprocess stdout to a caller.

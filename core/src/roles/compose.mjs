@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { loadRoleFile, schemaPath } from "./defaults.mjs";
-import { truncateInput, DEFAULTS } from "../budget.mjs";
+import { truncateInput } from "../budget.mjs";
 
 const AGENTS_MD_CAP = 8 * 1024;
 

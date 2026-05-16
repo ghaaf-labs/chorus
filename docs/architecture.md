@@ -38,7 +38,7 @@ core/src/invoke.mjs::callOne
 |---|---|---|
 | `core/src/cli.mjs` | Subcommand router + argv parser | No domain logic; just dispatch |
 | `core/src/invoke.mjs` | The `callOne` orchestrator | The only module that ties drivers + runner + role + summarizer together |
-| `core/src/council.mjs` | Parallel fan-out (M4 will harden) | M0/M1: simple `Promise.all` over `callOne` calls |
+| `core/src/council.mjs` | Parallel fan-out and consensus | Dedupes targets, validates quorum, links participant jobs |
 | `core/src/runners/process.mjs` | Subprocess execution + caps + timeouts | One runner per `runMode` (M0: only `subprocess`) |
 | `core/src/targets/driver.mjs` | The `TargetDriver` contract (JSDoc only) | Each target module conforms |
 | `core/src/targets/{claude,codex}.mjs` | Per-target driver: `buildInvocation`, `extractAssistant`, `extractTokens` | Drivers never spawn |
@@ -73,7 +73,7 @@ core/src/invoke.mjs::callOne
 { error: "self_target",        target }                             // target == source without --allow-self
 { error: "target_unavailable", target }                             // requested target failed availability
 { error: "no_available_target", attempted }                         // role fallback chain exhausted
-{ error: "target_not_implemented", target }                         // driver not wired yet (Grok/OpenCode pre-M3/M2)
+{ error: "target_not_implemented", target }                         // registry references a driver not wired in this build
 { error: "schema_violation", reason, validator_errors_summary, raw_excerpt }
 { error: "unsupported_mode",  detail }                              // driver doesn't support requested runMode
 ```
@@ -127,4 +127,23 @@ Chorus could, in principle, import target SDKs in-process. It deliberately does 
 - Resource accounting via the OS (RSS, CPU, wall-clock).
 - No risk of the buddy's runtime leaking objects into the parent's heap.
 
-The price is per-call cold-start latency, ~200 ms–2 s depending on the CLI. M5 will optionally let drivers opt into a long-lived runner (Codex `app-server`, Grok ACP, OpenCode `serve`) where this matters.
+The price is per-call cold-start latency, ~200 ms-2 s depending on the CLI.
+Drivers that support ACP can opt into long-lived sessions.
+
+## Stability
+
+| Surface | Stability | Notes |
+| --- | --- | --- |
+| `call` | Stable | Core envelope shape is stable for v0.1.x |
+| `council` | Stable | Quorum and participant fields are stable |
+| `setup`, `doctor`, `status`, `history`, `version` | Stable | Intended for scripts |
+| `replay`, `lineage` | Stable | Reads old `parent_job_id` and current `parent_job_ids` |
+| `canary check`, `trust report` | Stable | Trust report schema may add fields only |
+| `acp` | Stable | ACP server surface is intended for host integrations |
+| `playbook`, `dedup`, `regress`, `bulk-query` | Experimental | Output shape can change before v0.2 |
+| `drift`, `trust --ci`, `canary fuzz` | Experimental | Useful in CI, but thresholds may change |
+| `mcp` | Experimental | Current implementation is a stub |
+| `init` | Stable | May add prompts, but keeps `--yes` behavior |
+
+`jobs.jsonl` entries are append-only for v0.1.x. Future schema changes must
+keep old entries readable or ship a migration command.

@@ -23,11 +23,11 @@ import { loadPricing } from "./pricing.mjs";
 const SAFETY_MARGIN = 1.3;
 
 function budgetPath() {
-  return path.join(os.homedir(), ".chorus", "budget.json");
+  return process.env.CHORUS_BUDGET_PATH || path.join(os.homedir(), ".chorus", "budget.json");
 }
 
 function dailyLedgerPath() {
-  return path.join(os.homedir(), ".chorus", "daily-spend.jsonl");
+  return process.env.CHORUS_SPEND_LEDGER_PATH || path.join(os.homedir(), ".chorus", "daily-spend.jsonl");
 }
 
 export function loadBudget() {
@@ -65,9 +65,12 @@ export function readTodaySpend() {
 export function recordSpend(usd) {
   if (!Number.isFinite(usd) || usd <= 0) return;
   try {
-    fs.mkdirSync(path.dirname(dailyLedgerPath()), { recursive: true });
+    fs.mkdirSync(path.dirname(dailyLedgerPath()), { recursive: true, mode: 0o700 });
     fs.appendFileSync(dailyLedgerPath(), JSON.stringify({ day: todayUtc(), usd, ts: new Date().toISOString() }) + "\n");
-  } catch { /* ignore */ }
+  } catch (err) {
+    // Don't lose the spend silently; warn so daily-ledger problems are visible.
+    try { process.stderr.write(`chorus: recordSpend failed (${err?.message ?? err})\n`); } catch { /* swallow */ }
+  }
 }
 
 export function estimatePreflightCost({ model, promptBytes, maxOutputTokens }) {
@@ -82,7 +85,7 @@ export function estimatePreflightCost({ model, promptBytes, maxOutputTokens }) {
  * Returns { allow, error?, hint?, estimated_cost_usd, ceiling_usd }.
  * If budget.json is absent or warn_only=true and ceiling exceeded, allow=true.
  */
-export function checkBudget({ model, promptBytes, maxOutputTokens, target }) {
+export function checkBudget({ model, promptBytes, maxOutputTokens, target: _target }) {
   const budget = loadBudget();
   if (!budget) return { allow: true };
   const estimated = estimatePreflightCost({ model, promptBytes, maxOutputTokens });

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import http from "node:http";
 
 import { truncateInput } from "../../src/budget.mjs";
 import { _validatorCacheSize, _validatorCacheReset, validateAndTrim } from "../../src/summarize.mjs";
@@ -16,10 +17,16 @@ beforeEach(() => {
   saved = {
     HOME: process.env.HOME,
     CHORUS_OTEL_FILE: process.env.CHORUS_OTEL_FILE,
+    CHORUS_OTEL_ENDPOINT: process.env.CHORUS_OTEL_ENDPOINT,
+    CHORUS_OTEL_AUTH: process.env.CHORUS_OTEL_AUTH,
+    CHORUS_BUDGET_PATH: process.env.CHORUS_BUDGET_PATH,
+    CHORUS_SPEND_LEDGER_PATH: process.env.CHORUS_SPEND_LEDGER_PATH,
     CHORUS_DISABLE_AGENTS_MD: process.env.CHORUS_DISABLE_AGENTS_MD
   };
   tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-m9-"));
   process.env.HOME = tmpHome;
+  process.env.CHORUS_BUDGET_PATH = path.join(tmpHome, ".chorus", "budget.json");
+  process.env.CHORUS_SPEND_LEDGER_PATH = path.join(tmpHome, ".chorus", "daily-spend.jsonl");
   _validatorCacheReset();
 });
 
@@ -116,20 +123,20 @@ describe("budget-firewall", () => {
 });
 
 describe("otel.emitSpan", () => {
-  it("no-op when no env set", () => {
+  it("no-op when no env set", async () => {
     delete process.env.CHORUS_OTEL_FILE;
     delete process.env.CHORUS_OTEL_ENDPOINT;
-    emitSpan({ name: "x", traceId: "a", spanId: "b", startNs: "1", endNs: "2", attributes: {} });
+    await emitSpan({ name: "x", traceId: "a", spanId: "b", startNs: "1", endNs: "2", attributes: {} });
     // No file should have been written
     const candidate = path.join(tmpHome, ".chorus", "otel.jsonl");
     expect(fs.existsSync(candidate)).toBe(false);
   });
 
-  it("writes a span line when CHORUS_OTEL_FILE set", () => {
+  it("writes a span line when CHORUS_OTEL_FILE set", async () => {
     const file = path.join(tmpHome, "otel.jsonl");
     process.env.CHORUS_OTEL_FILE = file;
     const ctx = newTraceContext();
-    emitSpan({
+    await emitSpan({
       name: "chorus.call.reviewer",
       traceId: ctx.trace_id,
       spanId: ctx.span_id,
@@ -143,6 +150,48 @@ describe("otel.emitSpan", () => {
     expect(obj.name).toBe("chorus.call.reviewer");
     expect(obj.resource["service.name"]).toBe("chorus");
     expect(obj.attributes["chorus.target"]).toBe("codex");
+  });
+
+  it("posts OTLP/HTTP JSON when CHORUS_OTEL_ENDPOINT is set", async () => {
+    const bodies = [];
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.setEncoding("utf8");
+      req.on("data", (chunk) => { body += chunk; });
+      req.on("end", () => {
+        bodies.push({ url: req.url, headers: req.headers, body });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end("{}");
+      });
+    });
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const { port } = server.address();
+      process.env.CHORUS_OTEL_ENDPOINT = `http://127.0.0.1:${port}/v1/traces`;
+      process.env.CHORUS_OTEL_AUTH = "Bearer test";
+      const ctx = newTraceContext();
+      await emitSpan({
+        name: "chorus.call.reviewer",
+        traceId: ctx.trace_id,
+        spanId: ctx.span_id,
+        startNs: "1",
+        endNs: "2",
+        attributes: {
+          "chorus.target": "codex",
+          "gen_ai.request.model": "gpt-test",
+          "gen_ai.usage.input_tokens": 12
+        }
+      });
+      expect(bodies.length).toBe(1);
+      expect(bodies[0].url).toBe("/v1/traces");
+      expect(bodies[0].headers.authorization).toBe("Bearer test");
+      const payload = JSON.parse(bodies[0].body);
+      const attrs = payload.resourceSpans[0].scopeSpans[0].spans[0].attributes;
+      expect(attrs.find((a) => a.key === "gen_ai.request.model")?.value.stringValue).toBe("gpt-test");
+      expect(attrs.find((a) => a.key === "gen_ai.usage.input_tokens")?.value.intValue).toBe("12");
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
   });
 
   it("newTraceContext returns 32-hex trace_id and 16-hex span_id", () => {

@@ -110,7 +110,7 @@ export function truncateDeep(value, max = DEFAULTS.summary_max_chars, fieldsTrun
     return value;
   }
   if (Array.isArray(value)) {
-    return value.map((v, i) => truncateDeep(v, max, fieldsTruncated));
+    return value.map((v) => truncateDeep(v, max, fieldsTruncated));
   }
   if (value && typeof value === "object") {
     const out = {};

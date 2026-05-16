@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { callOne } from "./invoke.mjs";
 import { callCouncil } from "./council.mjs";
-import { refreshRegistry, readRegistry, loadOrRefresh } from "./registry.mjs";
+import { refreshRegistry, loadOrRefresh } from "./registry.mjs";
 import { readJobIndex } from "./logging.mjs";
 import { ROLE_NAMES, pickDefaultRole } from "./roles/defaults.mjs";
 import { findJobById, loadJobPayload } from "./replay.mjs";
@@ -25,6 +25,7 @@ usage:
   chorus drift [--since 7d] [--target X] [--json]
   chorus trust [report|--ci] [--since 24h] [--max-drift N] [--json]
   chorus canary fuzz [--rounds N] [--target X] [--classes a,b,c]
+  chorus init [--yes]
   chorus acp                      start ACP server on stdio (for Zed/JetBrains/etc)
   chorus setup [--refresh-stale <hours>]
   chorus doctor [--deep]
@@ -47,7 +48,7 @@ call/council options:
   --source <name>             override caller-host name (default "cli")
   --allow-self                allow target == source
   --output-format json|text   default: json
-  --target <name>             one of: claude-code, codex, grok, opencode
+  --target <name>             one of: claude-code, codex, grok, opencode, grok-build, copilot, knowledge
   --role <name>               one of: ${ROLE_NAMES.join(", ")} (auto-routed from --task if omitted)
 
 env:
@@ -96,6 +97,8 @@ export async function main(argv) {
       return cmdDrift(parseFlags(rest));
     case "acp":
       return cmdAcp();
+    case "init":
+      return cmdInit(parseFlags(rest));
     case "setup":
       return cmdSetup(parseFlags(rest));
     case "doctor":
@@ -565,7 +568,6 @@ async function cmdRegress(flags) {
       allowSelf: true,
       parentJobIds: [e.job_id]
     });
-    const oldVerdict = (await import("./replay.mjs")).findJobById(e.job_id);
     const verdictNow = r.result?.verdict ?? r.ok;
     const drifted = r.ok !== e.ok ? true : false;
     if (drifted) drift++;
@@ -710,6 +712,16 @@ async function cmdAcp() {
   return 0;
 }
 
+async function cmdInit(flags = {}) {
+  const { runInitWizard } = await import("./init/wizard.mjs");
+  const probe = flags["skip-probe"]
+    ? { node: process.version, platform: `${process.platform}/${process.arch}`, hosts: {}, available: [] }
+    : undefined;
+  const result = await runInitWizard({ yes: Boolean(flags.yes), probe });
+  if (flags.json) process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+  return result.ok ? 0 : 1;
+}
+
 async function cmdSetup(flags) {
   const data = refreshRegistry();
   if (flags.quiet) return 0;
@@ -718,7 +730,7 @@ async function cmdSetup(flags) {
 }
 
 async function cmdDoctor(flags = {}) {
-  const data = loadOrRefresh();
+  const data = flags.deep ? refreshRegistry() : loadOrRefresh();
   const lines = [
     `chorus 0.1.0 — capability registry`,
     `refreshed: ${data.refreshed_at}`,
@@ -742,11 +754,15 @@ async function cmdDoctor(flags = {}) {
     const targets = Object.entries(data.hosts).filter(([, info]) => info.available).map(([n]) => n);
     for (const target of targets) {
       const start = Date.now();
+      const role = target === "knowledge" ? "retriever" : "researcher";
+      const task = target === "knowledge"
+        ? "Chorus installation documentation"
+        : "Reply with the single word: PONG.";
       const r = await callOne({
         source: "doctor",
         target,
-        role: "researcher",
-        task: "Reply with the single word: PONG.",
+        role,
+        task,
         timeoutS: 60,
         maxTokens: 50,
         allowSelf: true

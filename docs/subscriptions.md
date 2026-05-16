@@ -1,6 +1,8 @@
 # Using Chorus with your existing subscriptions
 
-Chorus is built so you can run a 4-CLI mesh on subscriptions you already pay for. It does not need API keys. It does not bill anything itself. It shells out to each vendor's official CLI, and those CLIs use whichever auth you set up.
+Chorus is built so you can run a multi-CLI mesh on subscriptions you already
+pay for. It does not need API keys. It does not bill anything itself. It shells
+out to each vendor's official CLI, and those CLIs use whichever auth you set up.
 
 This page is the current truth as of May 2026. The landscape shifted hard in Q1-Q2 2026 (Anthropic banned third-party tools from using Pro/Max OAuth on April 4) — the strategy below works around all of it.
 
@@ -18,7 +20,9 @@ If you want to maximize coverage at the lowest total cost:
 | ChatGPT Plus | codex *and* opencode (via OpenAI provider) | $20 |
 | SuperGrok | grok | $30–$300 |
 
-Bundling Pro + Plus + SuperGrok Lite gives you the full 4×4 mesh for ~$60/month with zero per-call API costs. The Grok edges are slower but still free at the per-call level once you have any SuperGrok tier active for `grok` CLI access.
+Bundling Pro + Plus + a Grok tier gives you the core Chorus mesh with zero
+per-call API costs inside subscription quotas. Grok edges can be slower, but
+they stay inside the CLI quota once your tier includes CLI access.
 
 ## Per-target subscription details
 

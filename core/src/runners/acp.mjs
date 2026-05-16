@@ -1,5 +1,4 @@
 import { AcpClient } from "../acp/client.mjs";
-import { DEFAULTS } from "../budget.mjs";
 
 const POOL = new Map();
 let exitHookInstalled = false;

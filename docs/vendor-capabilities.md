@@ -1,6 +1,9 @@
 # Vendor capability matrix
 
-Chorus presents one API across four CLIs, but the CLIs are not interchangeable. This page documents what each target actually provides at each layer, especially over ACP — where the protocol does not standardize many of the things Chorus needs.
+Chorus presents one API across several target CLIs and one local retrieval
+target, but the targets are not interchangeable. This page documents what each
+target provides at each layer, especially over ACP, where the protocol does not
+standardize many of the fields Chorus needs.
 
 ## Subprocess vs ACP, per target
 
@@ -10,6 +13,9 @@ Chorus presents one API across four CLIs, but the CLIs are not interchangeable. 
 | `codex` | `codex exec --json --sandbox read-only --skip-git-repo-check --ephemeral` | `codex-acp` (community bridge; auto-detected on `$PATH`) | Subprocess is default. ACP needs `cargo install codex-acp` (or `npm i -g codex-acp` if a JS port exists). |
 | `grok` | `grok -p --output-format json --no-subagents --no-plan` | `grok agent stdio` (native ACP server) | ACP is default; warm sessions are ~2× faster than subprocess. |
 | `opencode` | `opencode run --pure --format json --agent chorus-buddy --dangerously-skip-permissions` | `opencode acp --pure` (native ACP server). `--model X` plumbed via `OPENCODE_MODEL` env. | ACP is default. |
+| `grok-build` | `grok build ...` | n/a | Subprocess target. |
+| `copilot` | `copilot ...` | n/a | Subprocess target. |
+| `knowledge` | `uv run knowledge search ... --no-telemetry` | n/a | Local retrieval peer, not an LLM. |
 
 ## Token counting — the M6.5 gap
 

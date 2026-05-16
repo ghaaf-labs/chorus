@@ -32,17 +32,23 @@ vi.mock("../../src/targets/codex.mjs", async (importActual) => {
 });
 
 let tmpLogDir;
-let saved = {};
+let tmpBudgetPath;
+const saved = {};
 
 beforeEach(() => {
   tmpLogDir = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-test-"));
+  tmpBudgetPath = path.join(tmpLogDir, "budget.json");
   saved.CHORUS_REPO_ROOT = process.env.CHORUS_REPO_ROOT;
+  saved.CHORUS_BUDGET_PATH = process.env.CHORUS_BUDGET_PATH;
   process.env.CHORUS_REPO_ROOT = tmpLogDir;
+  process.env.CHORUS_BUDGET_PATH = tmpBudgetPath;
 });
 
 afterEach(() => {
   if (saved.CHORUS_REPO_ROOT === undefined) delete process.env.CHORUS_REPO_ROOT;
   else process.env.CHORUS_REPO_ROOT = saved.CHORUS_REPO_ROOT;
+  if (saved.CHORUS_BUDGET_PATH === undefined) delete process.env.CHORUS_BUDGET_PATH;
+  else process.env.CHORUS_BUDGET_PATH = saved.CHORUS_BUDGET_PATH;
   try { fs.rmSync(tmpLogDir, { recursive: true, force: true }); } catch { /* ignore */ }
   for (const k of Object.keys(process.env)) {
     if (k.startsWith("CHORUS_STUB_")) delete process.env[k];

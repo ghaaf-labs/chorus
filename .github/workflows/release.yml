@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+      - run: npm audit signatures
+      - run: npm audit --omit=dev
+      - run: npm run lint
+      - run: npm test
+      - run: npm run eval:check
+
+      - name: Verify pack manifest
+        run: |
+          npm pack --dry-run --json > pack-manifest.json
+          node -e "const p=require('./pack-manifest.json')[0]; const bad=p.files.filter(f=>/\\.symlink\\.bak$|node_modules|\\.logs|\\.payload\\.json|\\.test\\.mjs$/.test(f.path)); if (bad.length) { console.error(bad.map(f=>f.path).join('\n')); process.exit(1); }"
+
+      - name: Build SBOM
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          npx --yes @cyclonedx/cdxgen@latest -t js --spec-version 1.7 -o "chorus-cli-${VERSION}-sbom.cdx.json"
+
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            "chorus-cli-${VERSION}-sbom.cdx.json" \
+            pack-manifest.json \
+            --generate-notes \
+            --title "$GITHUB_REF_NAME"
