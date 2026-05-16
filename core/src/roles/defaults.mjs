@@ -10,7 +10,9 @@ const ROLE_FALLBACKS = {
   reviewer: ["codex", "grok", "opencode", "claude-code"],
   researcher: ["grok", "codex", "opencode", "claude-code"],
   architect: ["codex", "claude-code", "opencode", "grok"],
-  "devils-advocate": ["grok", "codex", "claude-code", "opencode"]
+  "devils-advocate": ["grok", "codex", "claude-code", "opencode"],
+  retriever: ["knowledge"],
+  judge: ["claude-code", "codex", "grok", "opencode"]
 };
 
 export const ROLE_NAMES = Object.keys(ROLE_FALLBACKS);

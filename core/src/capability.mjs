@@ -19,6 +19,10 @@ const PROBES = {
   opencode: {
     binary: "opencode",
     versionArgs: ["--version"]
+  },
+  knowledge: {
+    binary: "uv",
+    versionArgs: ["--version"]
   }
 };
 

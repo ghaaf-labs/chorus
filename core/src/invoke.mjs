@@ -5,6 +5,7 @@ import * as claudeDriver from "./targets/claude.mjs";
 import * as codexDriver from "./targets/codex.mjs";
 import * as opencodeDriver from "./targets/opencode.mjs";
 import * as grokDriver from "./targets/grok.mjs";
+import * as knowledgeDriver from "./targets/knowledge.mjs";
 import { SUBPROCESS, ACP } from "./targets/driver.mjs";
 import { runSubprocess } from "./runners/process.mjs";
 import { runAcp } from "./runners/acp.mjs";
@@ -20,7 +21,8 @@ const DRIVERS = {
   "claude-code": claudeDriver,
   codex: codexDriver,
   opencode: opencodeDriver,
-  grok: grokDriver
+  grok: grokDriver,
+  knowledge: knowledgeDriver
 };
 
 const ERROR_HINTS = {
@@ -156,6 +158,7 @@ export async function callOne({
     spec = driver.buildInvocation({
       mode,
       prompt: composed.prompt,
+      task,
       model,
       maxTokens,
       schemaPath: composed.schemaPath,

@@ -31,6 +31,9 @@ call/council options:
   --mode acp|subprocess       transport (default: target's first supported mode)
   --redact                    strip emails/PATs/secrets before send (also CHORUS_REDACT=1)
   --parent <id>[,<id>...]     explicitly link new job to prior job_id(s) for lineage
+  --retrieve                  pre-call the knowledge target, inject chunks as <untrusted>
+  --judge <target>            (council) post-merge participant verdicts via a judge target
+  --moa "l1=a,b; l2=c"        layered Mixture-of-Agents call (see docs/acp.md)
   --timeout <seconds>         wall-clock timeout (default 300)
   --max-tokens <n>            output token budget (default 60000)
   --source <name>             override caller-host name (default "cli")
@@ -150,23 +153,83 @@ async function cmdCall(flags) {
     return 2;
   }
 
-  const parentJobIds = flags.parent
+  if (flags.moa) {
+    const { parseMoaSpec, runMoa } = await import("./moa.mjs");
+    const layers = parseMoaSpec(flags.moa);
+    if (!layers) {
+      process.stderr.write(`chorus: bad --moa spec '${flags.moa}' (expected 'l1=a,b; l2=c')\n`);
+      return 2;
+    }
+    const result = await runMoa({
+      layers,
+      source: flags.source ?? "cli",
+      role: flags.role,
+      task: flags.task,
+      inputText,
+      model: flags.model,
+      timeoutS
+    });
+    emit(result, flags["output-format"] ?? "json");
+    return result.ok ? 0 : 1;
+  }
+
+  let parentJobIds = flags.parent
     ? String(flags.parent).split(",").map((s) => s.trim()).filter(Boolean)
     : undefined;
+
+  let effectiveInput = inputText;
+  let untrustedInput = false;
+  if (flags.retrieve) {
+    const retrieverResult = await callOne({
+      source: flags.source ?? "cli",
+      target: "knowledge",
+      role: "retriever",
+      task: flags.task,
+      timeoutS: timeoutS ?? 60,
+      allowSelf: true
+    });
+    if (!retrieverResult.ok) {
+      emit(retrieverResult, flags["output-format"] ?? "json");
+      return 1;
+    }
+    const { scanForBreaches } = await import("./canary.mjs");
+    const breaches = scanForBreaches(JSON.stringify(retrieverResult.result));
+    if (breaches.length) {
+      process.stderr.write(`chorus: rag_canary_breach in retrieval — quarantined\n`);
+      const env = {
+        chorus_version: "0.1.0",
+        ok: false,
+        error: "rag_canary_breach",
+        breaches,
+        retriever_job_id: retrieverResult.job_id
+      };
+      emit(env, flags["output-format"] ?? "json");
+      return 1;
+    }
+    const chunks = retrieverResult.result?.chunks ?? [];
+    const chunkText = chunks.map((c, i) =>
+      `[chunk ${i + 1}] ${c.path} (score=${c.score.toFixed?.(3) ?? c.score})\n${c.excerpt}`
+    ).join("\n\n---\n\n");
+    effectiveInput = (inputText ? inputText + "\n\n---\n\n" : "") + chunkText;
+    untrustedInput = true;
+    parentJobIds = [...(parentJobIds ?? []), retrieverResult.job_id];
+    process.stderr.write(`[chorus: retrieved ${chunks.length} chunks via knowledge target]\n`);
+  }
 
   const result = await callOne({
     source: flags.source ?? "cli",
     target: flags.target,
     role: flags.role,
     task: flags.task,
-    inputText,
+    inputText: effectiveInput,
     model: flags.model,
     timeoutS,
     maxTokens,
     allowSelf: Boolean(flags["allow-self"]),
     mode: flags.mode,
     redact: Boolean(flags.redact),
-    parentJobIds
+    parentJobIds,
+    untrustedInput
   });
 
   emit(result, flags["output-format"] ?? "json");
@@ -206,6 +269,38 @@ async function cmdCouncil(flags) {
     quorum: flags.quorum,
     force: Boolean(flags.force)
   });
+
+  if (flags.judge && result.ok !== false) {
+    const judgeInput = JSON.stringify({
+      task: flags.task,
+      role: flags.role,
+      participants: result.participants,
+      dissent: result.dissent,
+      failures: result.failures,
+      consensus_from_voting: result.consensus
+    }, null, 2);
+    const judgeResult = await callOne({
+      source: flags.source ?? "cli",
+      target: flags.judge,
+      role: "judge",
+      task: `Synthesize a merged verdict for the council on role '${flags.role}' (see <input>).`,
+      inputText: judgeInput,
+      timeoutS: councilTimeoutS,
+      allowSelf: true,
+      parentJobIds: [result.job_id]
+    });
+    result.judge = {
+      target: flags.judge,
+      job_id: judgeResult.job_id,
+      ok: judgeResult.ok,
+      verdict: judgeResult.result?.merged_verdict ?? null,
+      result: judgeResult.result,
+      error: judgeResult.ok ? null : judgeResult.error
+    };
+    if (judgeResult.ok && judgeResult.result?.merged_verdict) {
+      result.consensus = judgeResult.result.merged_verdict;
+    }
+  }
 
   emit(result, flags["output-format"] ?? "json");
   return result.ok ? 0 : 1;
