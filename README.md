@@ -106,6 +106,7 @@ envelopes contain only the validated summary fields.
 - `docs/vendor-capabilities.md` — per-target capability matrix
 - `docs/observability-setup.md` — OTel exporters
 - `docs/distribution.md` — npm, Homebrew, Scoop, and installer channels
+- `docs/release.md` — publish checklist and npm Trusted Publishing setup
 
 ## Development
 
@@ -117,9 +118,9 @@ npm run eval:check
 npm pack --dry-run
 ```
 
-Before publishing, run `npm publish --dry-run --provenance --access public`.
-The tag-based release workflow publishes with npm provenance and attaches a
-CycloneDX SBOM to the GitHub Release.
+Before publishing, follow `docs/release.md`. The tag-based release workflow
+publishes with npm provenance and attaches a CycloneDX SBOM to the GitHub
+Release.
 
 ## License
 

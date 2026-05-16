@@ -6,7 +6,7 @@
   "notes": "Windows is not a supported Chorus v0.1.0 platform; this manifest is for validation before support is declared.",
   "depends": "nodejs-lts",
   "url": "https://registry.npmjs.org/@chorus/cli/-/cli-0.1.0.tgz",
-  "hash": "84a123aee485c5bd89a346846615f2437a1721902302a45315ec1e0d8c4e3476",
+  "hash": "999f4b5dc607c80d7cfd8c25c36edd5c46400995c0cb0655ed92e42b9138e0fd",
   "extract_dir": "package",
   "bin": [["bin\\chorus", "chorus"]],
   "checkver": {

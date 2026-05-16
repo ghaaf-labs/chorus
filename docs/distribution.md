@@ -9,6 +9,9 @@ npm install -g @chorus/cli
 The release workflow publishes from GitHub Actions with npm Trusted Publishing
 and provenance. No long-lived `NPM_TOKEN` is required.
 
+See `docs/release.md` for the publish checklist and npm Trusted Publishing
+setup.
+
 Secondary channels live under `dist/`:
 
 | Channel | File | Status |
