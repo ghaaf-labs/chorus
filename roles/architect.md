@@ -29,6 +29,13 @@ Pick one candidate and explain why in 1–3 sentences. List the open questions y
 - Don't pre-optimize for problems the user has not raised.
 - Don't propose architectures you'd be unwilling to defend.
 
+## Verdict (required, Chorus-normalized)
+
+Emit one of:
+- `approve` — the recommended candidate is defensible and you'd build it as designed.
+- `needs-attention` — the recommendation has unresolved open questions that block commitment.
+- `inconclusive` — the problem is under-specified and no candidate can be honestly recommended without more input.
+
 ## Output
 
 Return strict JSON conforming to the supplied schema. No prose outside JSON. No markdown fences.

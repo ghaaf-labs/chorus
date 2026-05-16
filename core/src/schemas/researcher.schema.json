@@ -3,8 +3,12 @@
   "$id": "https://chorus.dev/schemas/researcher.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["summary", "answers", "unknowns", "recommended_next_steps"],
+  "required": ["verdict", "summary", "answers", "unknowns", "recommended_next_steps"],
   "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["approve", "needs-attention", "inconclusive"]
+    },
     "summary": { "type": "string", "minLength": 1 },
     "answers": {
       "type": "array",

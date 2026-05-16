@@ -14,6 +14,7 @@ import { generateJobId, JobLogger, newJobLogPath, appendJobIndex } from "./loggi
 import { resolveTarget } from "./roles/defaults.mjs";
 import { loadOrRefresh } from "./registry.mjs";
 import { estimateCostUsd } from "./pricing.mjs";
+import { redactText, redactionEnabled } from "./redact.mjs";
 
 const DRIVERS = {
   "claude-code": claudeDriver,
@@ -63,9 +64,25 @@ export async function callOne({
   allowSelf = false,
   registry: providedRegistry,
   mode: requestedMode,
-  parentJobId,
-  abortSignal
+  parentJobIds,
+  abortSignal,
+  untrustedInput = false,
+  redact = false
 } = {}) {
+  const willRedact = redact || redactionEnabled();
+  let redactionMapping = [];
+  if (willRedact) {
+    if (typeof task === "string" && task) {
+      const r = redactText(task);
+      task = r.text;
+      redactionMapping = redactionMapping.concat(r.mapping);
+    }
+    if (typeof inputText === "string" && inputText) {
+      const r = redactText(inputText);
+      inputText = r.text;
+      redactionMapping = redactionMapping.concat(r.mapping);
+    }
+  }
   const preGuards = checkGuards({ source, target: requestedTarget ?? "<auto>", role });
   if (preGuards.blocked) {
     return errorEnvelope({
@@ -73,7 +90,7 @@ export async function callOne({
       target: requestedTarget ?? null,
       role,
       model,
-      parentJobId,
+      parentJobIds,
       error: preGuards.error,
       detail: { depth: preGuards.depth, max_depth: maxDepth(), trace: preGuards.trace ?? [] }
     });
@@ -87,7 +104,7 @@ export async function callOne({
       target: resolved.target ?? requestedTarget ?? null,
       role,
       model,
-      parentJobId,
+      parentJobIds,
       error: resolved.error,
       detail: { attempted: resolved.attempted }
     });
@@ -96,7 +113,7 @@ export async function callOne({
   const driver = DRIVERS[target];
   if (!driver) {
     return errorEnvelope({
-      source, target, role, model, parentJobId,
+      source, target, role, model, parentJobIds,
       error: "target_not_implemented"
     });
   }
@@ -108,7 +125,8 @@ export async function callOne({
     task,
     inputText,
     depth: currentDepth() + 1,
-    maxDepth: maxDepth()
+    maxDepth: maxDepth(),
+    untrusted: Boolean(untrustedInput)
   });
 
   const jobId = generateJobId();
@@ -130,7 +148,7 @@ export async function callOne({
     composed_prompt_bytes: Buffer.byteLength(composed.prompt, "utf8"),
     depth: currentDepth() + 1,
     schema_id: schemaIdFromRole(role),
-    parent_job_id: parentJobId ?? null
+    parent_job_ids: parentJobIds ?? []
   });
 
   let spec;
@@ -147,7 +165,7 @@ export async function callOne({
     logger.event("build_invocation_error", { error: err.message });
     await logger.close();
     return errorEnvelope({
-      source, target, role, model, parentJobId,
+      source, target, role, model, parentJobIds,
       error: "unsupported_mode",
       detail: { message: err.message }
     });
@@ -178,7 +196,7 @@ export async function callOne({
     logger.event("build_invocation_error", { error: `mode ${mode} not implemented` });
     await logger.close();
     return errorEnvelope({
-      source, target, role, model, parentJobId,
+      source, target, role, model, parentJobIds,
       error: "unsupported_mode",
       detail: { mode }
     });
@@ -188,6 +206,8 @@ export async function callOne({
     prompt: spec.stdin,
     task: task ?? null,
     input_text: inputText ?? null,
+    redaction_mapping: redactionMapping,
+    redaction_active: willRedact,
     stdout: runResult.stdout ?? "",
     stderr: runResult.stderr ?? ""
   });
@@ -204,7 +224,7 @@ export async function callOne({
     duration_ms: Date.now() - callStart,
     schema_id: schemaIdFromRole(role),
     trace_depth: currentDepth() + 1,
-    parent_job_id: parentJobId ?? null
+    parent_job_ids: parentJobIds ?? []
   };
 
   if (runResult.error) {
@@ -220,7 +240,17 @@ export async function callOne({
   }
 
   const assistantText = driver.extractAssistant(runResult, mode);
-  const tokens = driver.extractTokens(runResult, mode);
+  let tokens = driver.extractTokens(runResult, mode);
+  // ACP token fallback: most ACP-mode drivers can't recover usage stats from
+  // the agent (the spec doesn't standardize it). When tokens are zero on ACP,
+  // estimate from prompt + output bytes at ~4 chars/token; flag as estimated.
+  if (mode === ACP && (!tokens || tokens.total === 0)) {
+    const promptChars = Buffer.byteLength(spec.prompt || composed.prompt || "", "utf8");
+    const outputChars = Buffer.byteLength(assistantText || "", "utf8");
+    const input = Math.ceil(promptChars / 4);
+    const output = Math.ceil(outputChars / 4);
+    tokens = { input, output, total: input + output, estimated: true };
+  }
   logger.event("extracted", { assistant_chars: assistantText.length, tokens });
 
   const schema = JSON.parse(fs.readFileSync(composed.schemaPath, "utf8"));
@@ -291,7 +321,7 @@ function projectErrorDetail(runResult) {
   return out;
 }
 
-function errorEnvelope({ source, target, role, model, error, detail, parentJobId }) {
+function errorEnvelope({ source, target, role, model, error, detail, parentJobIds }) {
   return {
     chorus_version: "0.1.0",
     source,
@@ -300,7 +330,7 @@ function errorEnvelope({ source, target, role, model, error, detail, parentJobId
     model: model ?? null,
     schema_id: role ? schemaIdFromRole(role) : null,
     trace_depth: currentDepth() + 1,
-    parent_job_id: parentJobId ?? null,
+    parent_job_ids: parentJobIds ?? [],
     ok: false,
     error,
     hint: ERROR_HINTS[error],

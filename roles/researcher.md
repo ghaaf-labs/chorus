@@ -28,6 +28,13 @@ Answer the question in `<task>` concisely and with citations.
 - Distinguish what you know from what you do not. Use the `unknowns` array honestly.
 - Recommend follow-up steps the caller could take to verify or extend the answer.
 
+## Verdict (required, Chorus-normalized)
+
+Emit one of:
+- `approve` — claims are well-supported and the research question is answered.
+- `needs-attention` — answers exist but key unknowns or contested sources should be resolved before relying on them.
+- `inconclusive` — insufficient evidence to answer; the caller should not act on this output without follow-up.
+
 ## Output
 
 Return strict JSON conforming to the supplied schema. No prose outside JSON. No markdown fences.

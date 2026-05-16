@@ -3,8 +3,12 @@
   "$id": "https://chorus.dev/schemas/devils-advocate.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["objections", "falsifying_assumptions", "worst_realistic_outcome"],
+  "required": ["verdict", "objections", "falsifying_assumptions", "worst_realistic_outcome"],
   "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["approve", "needs-attention", "inconclusive"]
+    },
     "objections": {
       "type": "array",
       "minItems": 1,

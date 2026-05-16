@@ -7,7 +7,7 @@
   "properties": {
     "verdict": {
       "type": "string",
-      "enum": ["approve", "needs-attention"]
+      "enum": ["approve", "needs-attention", "inconclusive"]
     },
     "summary": { "type": "string", "minLength": 1 },
     "findings": {

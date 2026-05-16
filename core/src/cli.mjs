@@ -5,6 +5,7 @@ import { refreshRegistry, readRegistry, loadOrRefresh } from "./registry.mjs";
 import { readJobIndex } from "./logging.mjs";
 import { ROLE_NAMES, pickDefaultRole } from "./roles/defaults.mjs";
 import { findJobById, loadJobPayload } from "./replay.mjs";
+import { translateModel } from "./model-map.mjs";
 
 const USAGE = `chorus — multi-CLI agent collaboration
 
@@ -13,6 +14,7 @@ usage:
   chorus council --role <name> --targets a,b,c --task "<text>" [opts]
   chorus benchmark [--role <name>] [--task "<text>"] [--targets a,b,c] [--json]
   chorus replay <job_id> [--target <name>] [--role <name>] [--source <name>] [--model <id>]
+  chorus canary check [--limit N] [--json]
   chorus acp                      start ACP server on stdio (for Zed/JetBrains/etc)
   chorus setup [--refresh-stale <hours>]
   chorus doctor
@@ -25,6 +27,7 @@ call/council options:
   --input-file <path>         attach file contents as <input>
   --model <id>                override default model
   --mode acp|subprocess       transport (default: target's first supported mode)
+  --redact                    strip emails/PATs/secrets before send (also CHORUS_REDACT=1)
   --timeout <seconds>         wall-clock timeout (default 300)
   --max-tokens <n>            output token budget (default 60000)
   --source <name>             override caller-host name (default "cli")
@@ -59,6 +62,8 @@ export async function main(argv) {
       return cmdBenchmark(parseFlags(rest));
     case "replay":
       return cmdReplay(parseFlags(rest));
+    case "canary":
+      return cmdCanary(parseFlags(rest));
     case "acp":
       return cmdAcp();
     case "setup":
@@ -150,7 +155,8 @@ async function cmdCall(flags) {
     timeoutS,
     maxTokens,
     allowSelf: Boolean(flags["allow-self"]),
-    mode: flags.mode
+    mode: flags.mode,
+    redact: Boolean(flags.redact)
   });
 
   emit(result, flags["output-format"] ?? "json");
@@ -283,7 +289,17 @@ async function cmdReplay(flags) {
   const target = flags.target || entry.target;
   const role = flags.role || entry.role;
   const source = flags.source || `replay:${entry.source}`;
-  const model = flags.model || entry.model || undefined;
+  let model = flags.model || entry.model || undefined;
+  // If replaying onto a different vendor and the caller didn't override model,
+  // translate or drop the carried-over model name to avoid vendor-mismatch
+  // timeouts (the bug we hit in M6 dogfood).
+  if (model && target !== entry.target && !flags.model) {
+    const translated = translateModel(model, target);
+    if (translated !== model) {
+      process.stderr.write(`[chorus: model '${model}' → '${translated ?? "(target default)"}' for ${target}]\n`);
+      model = translated;
+    }
+  }
   process.stderr.write(`[chorus: replay ${jobId} → ${source}→${target} role=${role}${model ? ` model=${model}` : ""}]\n`);
   const result = await callOne({
     source,
@@ -292,11 +308,36 @@ async function cmdReplay(flags) {
     task: payload.task,
     inputText: payload.input_text ?? undefined,
     model,
-    parentJobId: entry.job_id,
+    parentJobIds: [entry.job_id],
     allowSelf: true
   });
   emit(result, flags["output-format"] ?? "json");
   return result.ok ? 0 : 1;
+}
+
+async function cmdCanary(flags) {
+  const sub = flags._?.[0];
+  if (sub !== "check") {
+    process.stderr.write("usage: chorus canary check [--limit N] [--json]\n");
+    return 2;
+  }
+  const { checkBreachesInLogs } = await import("./canary.mjs");
+  const limit = flags.limit ? Number.parseInt(flags.limit, 10) : 1000;
+  const breaches = checkBreachesInLogs({ limit });
+  if (flags.json) {
+    process.stdout.write(JSON.stringify({ scanned_limit: limit, breaches }, null, 2) + "\n");
+    return breaches.length ? 1 : 0;
+  }
+  if (!breaches.length) {
+    process.stdout.write(`chorus canary: no breaches found in last ${limit} payloads ✓\n`);
+    return 0;
+  }
+  process.stdout.write(`chorus canary: ${breaches.length} BREACH(es):\n`);
+  for (const b of breaches) {
+    const tokens = b.breaches.map((x) => x.token).join(", ");
+    process.stdout.write(`  ✗ ${b.file}  →  ${tokens}\n`);
+  }
+  return 1;
 }
 
 async function cmdAcp() {

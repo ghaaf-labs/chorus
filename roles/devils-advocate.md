@@ -30,6 +30,13 @@ Soft, agreeable critique is worse than no critique. If something is bad, say so 
 
 If after honest analysis the plan is sound, say so explicitly: include at least one objection whose `severity` is `low` and whose `evidence_or_reasoning` explains why the strongest objections you considered did not hold up. Do not invent objections to fill the array.
 
+## Verdict (required, Chorus-normalized)
+
+Emit one of:
+- `approve` — after honest critique, the plan is sound; no `critical` or `high` objection holds up.
+- `needs-attention` — at least one `high`-or-`critical` objection holds; the plan should not proceed without addressing it.
+- `inconclusive` — the proposal is under-specified or you cannot evaluate it without missing context.
+
 ## Output
 
 Return strict JSON conforming to the supplied schema. No prose outside JSON. No markdown fences.

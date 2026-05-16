@@ -27,8 +27,9 @@ Read the diff or files in `<input>` and identify defects, regressions, security 
 
 ## Output
 
-Verdict:
-- `approve` if there are no findings of severity `high` or `critical`.
-- `needs-attention` otherwise.
+Verdict (Chorus-normalized):
+- `approve` — no findings of severity `high` or `critical`.
+- `needs-attention` — at least one `high`-or-`critical` finding.
+- `inconclusive` — you could not perform the review (missing diff, unreadable input, unsupported language).
 
 Return strict JSON conforming to the supplied schema. No prose outside JSON. No markdown fences.
