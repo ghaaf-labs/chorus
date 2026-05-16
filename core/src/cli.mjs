@@ -19,7 +19,7 @@ usage:
   chorus lineage <job_id> [--json] [--mermaid]
   chorus acp                      start ACP server on stdio (for Zed/JetBrains/etc)
   chorus setup [--refresh-stale <hours>]
-  chorus doctor
+  chorus doctor [--deep]
   chorus status [--json]
   chorus history [--source <name>] [--target <name>] [--role <name>] [--since <Ns|Nm|Nh|Nd>] [--limit N] [--json]
   chorus version
@@ -485,7 +485,7 @@ async function cmdSetup(flags) {
   return 0;
 }
 
-async function cmdDoctor() {
+async function cmdDoctor(flags = {}) {
   const data = loadOrRefresh();
   const lines = [
     `chorus 0.1.0 — capability registry`,
@@ -504,6 +504,29 @@ async function cmdDoctor() {
     }
   }
   process.stdout.write(lines.join("\n") + "\n");
+
+  if (flags.deep) {
+    process.stdout.write("\ndeep probe (1-token round-trip per available target)...\n");
+    const targets = Object.entries(data.hosts).filter(([, info]) => info.available).map(([n]) => n);
+    for (const target of targets) {
+      const start = Date.now();
+      const r = await callOne({
+        source: "doctor",
+        target,
+        role: "researcher",
+        task: "Reply with the single word: PONG.",
+        timeoutS: 60,
+        maxTokens: 50,
+        allowSelf: true
+      });
+      const dur = `${((Date.now() - start) / 1000).toFixed(1)}s`;
+      const mark = r.ok ? "✓" : "✗";
+      const detail = r.ok
+        ? `tokens=${r.tokens?.total ?? 0}${r.tokens?.estimated ? "*" : ""} cost=$${(r.cost_usd_estimate ?? 0).toFixed(4)}`
+        : `error=${r.error}`;
+      process.stdout.write(`  ${target.padEnd(14)} ${mark} ${dur.padStart(7)}  ${detail}\n`);
+    }
+  }
   return 0;
 }
 

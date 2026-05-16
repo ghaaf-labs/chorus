@@ -38,7 +38,8 @@ export function checkGuards({ source, target, role }) {
       error: "max_depth_exceeded",
       depth,
       max_depth: limit,
-      trace: currentTrace()
+      trace: currentTrace(),
+      resolution: `Raise CHORUS_MAX_DEPTH (current=${limit}) or simplify the buddy chain — depth ${depth} already reached the limit before this call.`
     };
   }
   const trace = currentTrace();
@@ -49,7 +50,8 @@ export function checkGuards({ source, target, role }) {
       blocked: true,
       error: "cycle",
       edge,
-      trace
+      trace,
+      resolution: `The edge '${edge}' already appears in this chain. Break the cycle by changing role (try a different role on this target) or by calling --allow-self if intentional.`
     };
   }
   return { blocked: false };

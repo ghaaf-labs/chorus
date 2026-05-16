@@ -16,6 +16,8 @@ import { resolveTarget } from "./roles/defaults.mjs";
 import { loadOrRefresh } from "./registry.mjs";
 import { estimateCostUsd } from "./pricing.mjs";
 import { redactText, redactionEnabled } from "./redact.mjs";
+import { checkBudget, recordSpend } from "./budget-firewall.mjs";
+import { emitSpan, newTraceContext, nowNs } from "./otel.mjs";
 
 const DRIVERS = {
   "claude-code": claudeDriver,
@@ -28,6 +30,7 @@ const DRIVERS = {
 const ERROR_HINTS = {
   timeout: "Increase --timeout, or check whether the target is hanging.",
   aborted: "The call was cancelled by the caller (Ctrl-C, session/cancel, or AbortController.abort()).",
+  budget_exceeded: "Budget firewall blocked the call. Edit ~/.chorus/budget.json (set warn_only: true to log instead of block) or pass a cheaper --model.",
   stdout_overflow: "The target emitted more output than CHORUS_STDOUT_MAX_BYTES allows; the target may be misbehaving.",
   schema_violation: "The target's reply did not match the role's JSON schema. Inspect the .payload.json sidecar in ~/.chorus/logs/ for the raw output.",
   spawn_failed: "Could not start the target binary. Run `chorus doctor` to verify it is installed and authed.",
@@ -136,6 +139,8 @@ export async function callOne({
   const logger = new JobLogger(logPath);
   const startedAtIso = new Date().toISOString();
   const callStart = Date.now();
+  const traceCtx = newTraceContext();
+  const spanStartNs = nowNs();
 
   logger.event("start", {
     job_id: jobId,
@@ -173,6 +178,29 @@ export async function callOne({
       detail: { message: err.message }
     });
   }
+
+  // Budget firewall pre-flight (after build, before spawn).
+  const budgetCheck = checkBudget({
+    model,
+    promptBytes: Buffer.byteLength(spec.stdin || spec.prompt || composed.prompt, "utf8"),
+    maxOutputTokens: maxTokens,
+    target
+  });
+  if (!budgetCheck.allow) {
+    logger.event("budget_block", budgetCheck);
+    await logger.close();
+    return errorEnvelope({
+      source, target, role, model, parentJobIds,
+      error: "budget_exceeded",
+      detail: {
+        estimated_cost_usd: budgetCheck.estimated_cost_usd,
+        ceiling_usd: budgetCheck.ceiling_usd,
+        scope: budgetCheck.scope,
+        today_spent_usd: budgetCheck.today_spent_usd
+      }
+    });
+  }
+  if (budgetCheck.warning) logger.event("budget_warn", { warning: budgetCheck.warning });
 
   const childExtraEnv = childEnv({ source, target, role });
   let runResult;
@@ -281,6 +309,29 @@ export async function callOne({
   await logger.close();
 
   await appendJobIndex({ ...withCost, ok: true, log_path: logPath });
+  recordSpend(cost);
+
+  emitSpan({
+    name: `chorus.call.${role}`,
+    traceId: traceCtx.trace_id,
+    spanId: traceCtx.span_id,
+    startNs: spanStartNs,
+    endNs: nowNs(),
+    attributes: {
+      "chorus.job_id": jobId,
+      "chorus.source": source,
+      "chorus.target": target,
+      "chorus.role": role,
+      "chorus.model": model ?? "",
+      "chorus.mode": mode,
+      "chorus.tokens.input": tokens.input,
+      "chorus.tokens.output": tokens.output,
+      "chorus.tokens.total": tokens.total,
+      "chorus.tokens.estimated": Boolean(tokens.estimated),
+      "chorus.cost_usd": cost
+    },
+    status: "OK"
+  });
 
   return {
     ...withCost,

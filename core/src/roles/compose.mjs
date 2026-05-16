@@ -1,6 +1,26 @@
 import fs from "node:fs";
+import path from "node:path";
 import { loadRoleFile, schemaPath } from "./defaults.mjs";
 import { truncateInput, DEFAULTS } from "../budget.mjs";
+
+const AGENTS_MD_CAP = 8 * 1024;
+
+function loadAgentsMd() {
+  if (process.env.CHORUS_DISABLE_AGENTS_MD === "1") return null;
+  const candidates = [
+    path.join(process.cwd(), "AGENTS.md"),
+    path.join(process.cwd(), ".github", "AGENTS.md")
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        const raw = fs.readFileSync(p, "utf8");
+        return raw.length > AGENTS_MD_CAP ? raw.slice(0, AGENTS_MD_CAP) + "\n\n[chorus: AGENTS.md truncated]" : raw;
+      }
+    } catch { /* ignore */ }
+  }
+  return null;
+}
 
 export function loadSchema(role) {
   const p = schemaPath(role);
@@ -51,7 +71,10 @@ export function composePrompt({ role, sourceHost, task, inputText, depth, maxDep
     "</output_contract>"
   ].join("\n");
 
-  const prompt = [envelope, roleBlock, taskBlock, inputBlock, contract].filter(Boolean).join("\n\n");
+  const agentsMd = loadAgentsMd();
+  const agentsBlock = agentsMd ? `<repo_agents_md>\n${agentsMd}\n</repo_agents_md>` : "";
+
+  const prompt = [envelope, agentsBlock, roleBlock, taskBlock, inputBlock, contract].filter(Boolean).join("\n\n");
 
   return {
     prompt,
