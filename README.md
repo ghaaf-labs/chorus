@@ -35,9 +35,22 @@ Your Claude Code session grows by a few KB regardless of how much work Codex did
 
 Default target falls back gracefully (`reviewer`: codex → grok → opencode → claude) if a CLI isn't installed or authenticated.
 
+## Auth — your existing subscriptions work
+
+Chorus does not manage API keys. It calls each official CLI directly, so each subprocess inherits whatever auth the user set up:
+
+- **Claude Code** — Anthropic Pro / Max subscription via `claude login` OAuth
+- **Codex** — ChatGPT Plus / Pro subscription via `codex login`
+- **Grok** — SuperGrok tier via `grok` interactive login
+- **OpenCode** — routes to whichever provider you've logged in with via `opencode providers login`
+
+A Pro + Plus + SuperGrok Lite bundle (~$60/mo combined) covers the full 4×4 mesh at $0 per-call inside subscription quotas. See `docs/subscriptions.md` for the full breakdown including the 2026 Anthropic third-party ban and OpenAI–OpenCode partnership.
+
+Chorus is not a third-party harness — it shells out to each vendor's own binary, so the third-party-OAuth ban Anthropic enforced in April 2026 does not apply.
+
 ## Status
 
-v0.1 in development. M0 ships Claude Code as caller, Codex as target. See `docs/architecture.md` for the full milestone plan.
+v0.1 in development. Full 4×4 mesh live (M0 through M4). See `docs/architecture.md` for the milestone plan and `docs/subscriptions.md` for the auth strategy.
 
 ## License
 

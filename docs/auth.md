@@ -2,6 +2,8 @@
 
 Chorus does not manage API keys directly. It shells out to host CLIs that are already authenticated through their own login flows. This is intentional: each vendor has its own auth model (OAuth, ChatGPT login, subscription, provider-routed API keys) and Chorus respects whatever you already use.
 
+**If you're trying to figure out the cheapest subscription stack to run Chorus on, read `docs/subscriptions.md` first.** That page covers the 2026 vendor landscape (Anthropic third-party ban, OpenAI–OpenCode partnership, SuperGrok tiers) and recommends the per-tier configuration that maximizes coverage at lowest cost.
+
 Run `chorus doctor` at any time to see which targets are installed and authenticated.
 
 ## Claude Code
