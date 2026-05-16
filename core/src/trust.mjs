@@ -1,9 +1,9 @@
 /**
  * Chorus Trust v1 — measurement layer for cross-vendor safety.
  *
- * Composes the M6.5 primitives (canary + redact + verdict normalization +
- * vendor capability matrix) into a single signed report card that can be
- * piped into CI or aggregated cross-team.
+ * Composes canary detection, redaction checks, verdict drift, and the vendor
+ * capability matrix into a single report card that can be piped into CI or
+ * aggregated cross-team.
  */
 
 import fs from "node:fs";
@@ -33,8 +33,8 @@ export function listBreachesInJobs({ since } = {}) {
     try {
       payload = JSON.parse(fs.readFileSync(p, "utf8"));
     } catch (err) {
-      // Codex review: don't silently swallow — surface as unreadable so
-      // ciGate can fail-closed if the user opts in.
+      // Do not silently swallow corrupt sidecars; surface them so CI can
+      // fail closed when requested.
       unreadable.push({ job_id: e.job_id, file: p, error: err?.message ?? String(err) });
       continue;
     }
@@ -55,8 +55,8 @@ export function detectVerdictDrift({ since } = {}) {
   const filter = (e) =>
     e.started_at && (sinceMs === null || Date.parse(e.started_at) >= sinceMs);
   const entries = readJobIndex({ limit: 5000, filter });
-  // Codex review: tolerate plural OR singular legacy parent field; treat
-  // empty plural array as a fallback to singular (mixed-format rows).
+  // Tolerate plural OR singular legacy parent fields; treat an empty plural
+  // array as a fallback to the older singular field.
   const parentsOf = (e) => {
     const plural = Array.isArray(e.parent_job_ids) ? e.parent_job_ids : null;
     if (plural && plural.length) return plural;

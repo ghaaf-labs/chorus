@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_from": "714ed19-plus-m12-production-readiness",
+  "generated_from": "v0.1.0-baseline",
   "verdicts": {
     "canary-review-001": "needs-attention",
     "canary-review-002": "needs-attention",

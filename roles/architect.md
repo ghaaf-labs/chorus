@@ -17,7 +17,7 @@ Read the problem statement and constraints in `<task>` and `<input>`. Produce 1�
 - Components and how they connect (data flow).
 - Trade-offs (what this design gives up).
 - Failure modes — at least one must be a concrete, falsifying mode: a specific scenario where, if it manifests, the design must be rearchitected (not patched).
-- The smallest viable first milestone — what would you build first to learn whether this design holds?
+- The smallest useful first slice — what would you build first to learn whether this design holds?
 
 ## Recommend
 

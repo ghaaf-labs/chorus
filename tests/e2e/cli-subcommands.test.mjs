@@ -41,7 +41,7 @@ describe("chorus binary baseline", () => {
     expect(r.stdout).toMatch(/chorus \d+\.\d+\.\d+/);
   });
 
-  it("`chorus help` lists the M7-M11.5 subcommands", () => {
+  it("`chorus help` lists the advanced workflow subcommands", () => {
     const r = chorus(["help"]);
     expect(r.status).toBe(0);
     for (const cmd of ["lineage", "playbook", "regress", "bulk-query", "dedup", "mcp", "trust", "drift", "canary", "init"]) {

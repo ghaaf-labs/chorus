@@ -108,4 +108,4 @@ find ~/.chorus/logs -name "*.payload.json" -mtime +30 -delete
 
 Or just trim `~/.chorus/jobs.jsonl` to the last N lines.
 
-A future milestone will add automatic rotation; for now it's manual.
+A future release can add automatic rotation; for now it is manual.

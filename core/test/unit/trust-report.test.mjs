@@ -13,7 +13,7 @@ let tmpHome;
 
 beforeEach(() => {
   saved = { HOME: process.env.HOME };
-  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-m115-"));
+  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-trust-report-"));
   process.env.HOME = tmpHome;
 });
 

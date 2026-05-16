@@ -415,7 +415,7 @@ async function cmdReplay(flags) {
   }
   const payload = entry.log_path ? loadJobPayload(entry.log_path) : null;
   if (!payload || !payload.task) {
-    process.stderr.write(`chorus: job '${jobId}' is missing task payload — pre-M6 jobs are not replayable\n`);
+    process.stderr.write(`chorus: job '${jobId}' is missing task payload — older jobs without persisted tasks are not replayable\n`);
     return 2;
   }
   const target = flags.target || entry.target;
@@ -424,7 +424,7 @@ async function cmdReplay(flags) {
   let model = flags.model || entry.model || undefined;
   // If replaying onto a different vendor and the caller didn't override model,
   // translate or drop the carried-over model name to avoid vendor-mismatch
-  // timeouts (the bug we hit in M6 dogfood).
+  // timeouts caused by carrying a model name across incompatible vendors.
   if (model && target !== entry.target && !flags.model) {
     const translated = translateModel(model, target);
     if (translated !== model) {
@@ -676,7 +676,7 @@ async function cmdTrust(flags) {
 }
 
 async function cmdMcp() {
-  process.stderr.write("chorus mcp: server-stub placeholder (M11 base shipped; full MCP 2025-11-25 transport in a later milestone)\n");
+  process.stderr.write("chorus mcp: server-stub placeholder (full MCP 2025-11-25 transport is not wired yet)\n");
   process.stderr.write("for ACP-equivalent functionality use `chorus acp`.\n");
   return 0;
 }

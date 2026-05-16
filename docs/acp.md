@@ -27,7 +27,7 @@ When ACP is the first supported mode, `chorus call` prefers it. Force the transp
 
 **Process lifecycle.** SIGINT and SIGTERM drain the pool gracefully. Process exit closes whatever's still open.
 
-### Community ACP bridges (Claude Code + Codex) — **auto-detected as of M6**
+### Community ACP Bridges
 
 Install one or both:
 

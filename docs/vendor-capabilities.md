@@ -17,7 +17,7 @@ standardize many of the fields Chorus needs.
 | `copilot` | `copilot ...` | n/a | Subprocess target. |
 | `knowledge` | `uv run knowledge search ... --no-telemetry` | n/a | Local retrieval peer, not an LLM. |
 
-## Token counting — the M6.5 gap
+## Token Counting
 
 ACP does not standardize a usage/token-count metadata channel. Most ACP-mode targets return zero tokens to Chorus today:
 
@@ -32,11 +32,15 @@ ACP does not standardize a usage/token-count metadata channel. Most ACP-mode tar
 | opencode × subprocess | ✓ (from `step_finish` events) | ✓ | ✓ |
 | opencode × ACP | ✗ | ✗ | ✗ |
 
-**M6.5 fallback:** when ACP returns zero tokens, Chorus estimates from input/output byte counts at ~4 chars/token and tags the envelope with `tokens.estimated: true`. The `cost_usd_estimate` from this path is approximate — flag callers that the field is heuristic by checking `tokens.estimated`.
+When ACP returns zero tokens, Chorus estimates from input/output byte counts at
+~4 chars/token and tags the envelope with `tokens.estimated: true`. The
+`cost_usd_estimate` from this path is approximate. Callers that need cost-grade
+numbers should check `tokens.estimated` before relying on it.
 
 ## Cold-start latency
 
-Measured during M6 live dogfood (single Apple Silicon laptop, local install, default models):
+Measured on a single Apple Silicon laptop with local CLI installs and default
+models:
 
 | Target × mode | First call (cold) | Subsequent calls (warm pool) |
 |---|---|---|
@@ -56,7 +60,10 @@ The ACP pool in `core/src/runners/acp.mjs` keys connections by `target|model|cwd
 | `session/cancel` honored | bridge-dependent | bridge-dependent | yes | yes |
 | Process-group SIGTERM cleanup | ✓ (subprocess) | ✓ (subprocess) | ✓ (subprocess) | ✓ (subprocess) |
 
-Chorus's `session/cancel` (M6) sends a cancel notification upstream on ACP **and** SIGTERMs the pooled child if cancel was ignored — process tree escalation in `core/src/process.mjs::terminateProcessTreeWithEscalation` ensures the worker doesn't outlive the cancel.
+Chorus's `session/cancel` sends a cancel notification upstream on ACP **and**
+SIGTERMs the pooled child if cancel was ignored. Process tree escalation in
+`core/src/process.mjs::terminateProcessTreeWithEscalation` ensures the worker
+doesn't outlive the cancel.
 
 ## Schema enforcement
 
@@ -68,9 +75,12 @@ Chorus's `session/cancel` (M6) sends a cancel notification upstream on ACP **and
 | opencode × subprocess | none | XML envelope contract + custom `chorus-buddy` agent + client-side Ajv validation |
 | any × ACP | none | client-side Ajv validation only |
 
-Even when the target enforces server-side, Chorus re-validates client-side via Ajv2020 in `core/src/summarize.mjs`. The verdict normalization landed in M6.5 means every role now contributes a comparable verdict for M7 council consensus and M8 judge.
+Even when the target enforces server-side, Chorus re-validates client-side via
+Ajv2020 in `core/src/summarize.mjs`. Every role contributes a normalized
+verdict so council consensus and judge mode can compare target outputs.
 
 ## Council fan-out caveats
 
 - Targets with `runModes: [acp, ...]` share the same ACP pool entry within one process; concurrent council calls to the *same* target serialize on the same session.
-- The Knowledge Index target (M8) wraps a single-process Qdrant file store; concurrent retriever calls will serialize. Plan accordingly when adding `--retrieve` to council fan-outs.
+- The Knowledge Index target wraps a local Qdrant-backed store; plan for its
+  local runtime characteristics when adding `--retrieve` to council fan-outs.

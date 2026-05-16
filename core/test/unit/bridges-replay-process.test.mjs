@@ -22,7 +22,7 @@ beforeEach(() => {
     CHORUS_JOBS_ROTATE_BYTES: process.env.CHORUS_JOBS_ROTATE_BYTES,
     CHORUS_JOBS_ROTATE_KEEP: process.env.CHORUS_JOBS_ROTATE_KEEP
   };
-  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-m6-"));
+  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-bridge-replay-"));
   process.env.HOME = tmpHome;
   resetBridgeCache();
 });

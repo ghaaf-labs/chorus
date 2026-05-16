@@ -6,8 +6,8 @@
  * args) and writes <out>/index.html (default: ./leaderboard/index.html)
  * with a vendor × canary-class × week grid.
  *
- * The reports are signed-and-anchored in a later milestone; this v1
- * generator is the open-source piece every team can run locally.
+ * Report signing can be added in a future release; this generator is the
+ * open-source piece every team can run locally.
  */
 
 import fs from "node:fs";

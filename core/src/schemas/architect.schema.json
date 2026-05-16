@@ -16,7 +16,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["name", "summary", "components", "data_flow", "tradeoffs", "failure_modes", "first_milestone"],
+        "required": ["name", "summary", "components", "data_flow", "tradeoffs", "failure_modes", "first_slice"],
         "properties": {
           "name": { "type": "string", "minLength": 1 },
           "summary": { "type": "string", "minLength": 1 },
@@ -33,7 +33,7 @@
             "type": "array",
             "items": { "type": "string", "minLength": 1 }
           },
-          "first_milestone": { "type": "string", "minLength": 1 }
+          "first_slice": { "type": "string", "minLength": 1 }
         }
       }
     },

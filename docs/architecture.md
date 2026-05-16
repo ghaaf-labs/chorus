@@ -39,7 +39,7 @@ core/src/invoke.mjs::callOne
 | `core/src/cli.mjs` | Subcommand router + argv parser | No domain logic; just dispatch |
 | `core/src/invoke.mjs` | The `callOne` orchestrator | The only module that ties drivers + runner + role + summarizer together |
 | `core/src/council.mjs` | Parallel fan-out and consensus | Dedupes targets, validates quorum, links participant jobs |
-| `core/src/runners/process.mjs` | Subprocess execution + caps + timeouts | One runner per `runMode` (M0: only `subprocess`) |
+| `core/src/runners/process.mjs` | Subprocess execution + caps + timeouts | One runner per `runMode` |
 | `core/src/targets/driver.mjs` | The `TargetDriver` contract (JSDoc only) | Each target module conforms |
 | `core/src/targets/{claude,codex}.mjs` | Per-target driver: `buildInvocation`, `extractAssistant`, `extractTokens` | Drivers never spawn |
 | `core/src/roles/defaults.mjs` | Role registry, fallback orderings, frontmatter parser, `pickDefaultRole` heuristic | Single source of truth for which target gets which role |
@@ -98,9 +98,11 @@ The 9 mandatory controls are implemented as follows:
 
 ## Extending Chorus
 
-### Adding a new target (e.g. Grok in M3)
+### Adding a New Target
 
-1. Create `core/src/targets/grok.mjs` exporting the `TargetDriver` shape: `id`, `runModes`, `buildInvocation(args)`, `extractAssistant(runResult, mode)`, `extractTokens(runResult, mode)`.
+1. Create `core/src/targets/<target>.mjs` exporting the `TargetDriver` shape:
+   `id`, `runModes`, `buildInvocation(args)`, `extractAssistant(runResult,
+   mode)`, `extractTokens(runResult, mode)`.
 2. Register it in `core/src/invoke.mjs::DRIVERS`.
 3. Add it to `core/src/capability.mjs::PROBES` and `roles/defaults.mjs::ROLE_FALLBACKS` orderings.
 4. No changes needed in `runners/process.mjs` if the target still spawns a subprocess. A future long-lived-server runner would be a new file under `core/src/runners/`.
@@ -112,7 +114,7 @@ The 9 mandatory controls are implemented as follows:
 3. Add the role to `ROLE_FALLBACKS` in `roles/defaults.mjs`.
 4. Optionally: a shared subagent (`shared/agents/chorus-<name>.md`) and a slash command (`shared/commands/<name>.md`) to expose it natively in each host.
 
-### Adding a new host adapter (e.g. Codex CLI as caller in M1)
+### Adding a New Host Adapter
 
 1. Create `adapters/<host>/.<host>-plugin/plugin.json`.
 2. Symlink `agents/`, `commands/`, `skills/` to `../../shared/{agents,commands,skills}`.

@@ -32,7 +32,7 @@ export function buildInvocation({ mode, prompt, task, model: _model }) {
   if (!kiPath) {
     throw new Error("knowledge-index project not found; set CHORUS_KNOWLEDGE_INDEX_PATH");
   }
-  // Prefer raw task when provided (M7+). Fallback to extracting <task>...</task>
+  // Prefer raw task when provided. Fallback to extracting <task>...</task>
   // from the composed prompt for older callers.
   let query = (task && task.trim()) || extractTaskFromPrompt(prompt) || "";
   query = query.trim();
@@ -68,7 +68,7 @@ export function extractAssistant(runResult, mode) {
 export function extractTokens(runResult, mode) {
   if (mode !== SUBPROCESS) throw new Error("unsupported mode");
   // Knowledge-index is a retrieval engine, not an LLM — no token usage. The
-  // M6.5 ACP token fallback in invoke.mjs will tag this as estimated.
+  // The generic token fallback in invoke.mjs will tag this as estimated.
   return { input: 0, output: 0, total: 0 };
 }
 

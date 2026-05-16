@@ -5,9 +5,7 @@ Changelog style and uses Conventional Commits.
 
 ## [Unreleased]
 
-- Production-readiness work for GHA-725: strict publish hygiene, docs,
-  release automation, observability, eval gating, distribution templates, and
-  first-run initialization.
+- No unreleased changes yet.
 
 ## [0.1.0] - 2026-05-16
 

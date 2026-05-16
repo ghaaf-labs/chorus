@@ -8,7 +8,7 @@ import { redactText } from "../../src/redact.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(here, "..", "..", "..");
 
-describe("M12.1 — package.json publish hygiene", () => {
+describe("package.json publish hygiene", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 
   it("version is real semver (not '0.1.0-dev')", () => {
@@ -68,7 +68,7 @@ describe("M12.1 — package.json publish hygiene", () => {
   });
 });
 
-describe("M12.1 — redact.mjs covers 2026 vendor keys", () => {
+describe("redact.mjs covers current vendor keys", () => {
   it("redacts modern OpenAI sk- key", () => {
     const r = redactText("OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz1234567890");
     expect(r.text).toContain("<chorus-redacted:openai_key");
@@ -115,7 +115,7 @@ describe("M12.1 — redact.mjs covers 2026 vendor keys", () => {
   });
 });
 
-describe("M12.1 — eslint.config.mjs present + parseable", () => {
+describe("eslint.config.mjs present + parseable", () => {
   it("eslint config file exists and exports a config array", async () => {
     const cfgPath = path.join(ROOT, "eslint.config.mjs");
     expect(fs.existsSync(cfgPath)).toBe(true);

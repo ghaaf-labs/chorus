@@ -15,7 +15,7 @@ beforeEach(() => {
     CHORUS_DISABLE_AGENTS_MD: process.env.CHORUS_DISABLE_AGENTS_MD,
     CHORUS_VALIDATOR_CACHE_LIMIT: process.env.CHORUS_VALIDATOR_CACHE_LIMIT
   };
-  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-audit-"));
+  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-hardening-"));
   process.env.HOME = tmpHome;
   origCwd = process.cwd();
 });

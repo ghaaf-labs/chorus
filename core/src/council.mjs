@@ -20,9 +20,8 @@ export async function callCouncil({
   if (!Array.isArray(targets) || targets.length === 0) {
     return { ok: false, error: "no_targets" };
   }
-  // Codex review (HIGH): duplicate targets would let one host's vote be
-  // counted N times and trivially satisfy quorum. Dedupe up front while
-  // preserving order.
+  // Duplicate targets would let one host's vote be counted multiple times and
+  // trivially satisfy quorum. Dedupe up front while preserving order.
   const seenT = new Set();
   const dedupedTargets = [];
   for (const t of targets) {

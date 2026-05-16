@@ -42,7 +42,7 @@ const ERROR_HINTS = {
   nonzero_exit: "The target exited non-zero. Check the stderr_excerpt and run `chorus doctor`.",
   no_available_target: "Run `chorus setup` to refresh the capability registry.",
   target_unavailable: "Run `chorus setup` or check the target's auth status.",
-  target_not_implemented: "This target is planned for a later milestone. See docs/architecture.md.",
+  target_not_implemented: "This target is registered but not wired in this build. See docs/architecture.md.",
   max_depth_exceeded: "Buddy chain reached CHORUS_MAX_DEPTH. The current call would have recursed too deeply.",
   cycle: "Buddy chain would form a cycle through the same source→target→role edge.",
   self_target: "Source and target are the same; pass --allow-self if this is intentional.",
@@ -277,8 +277,8 @@ export async function callOne({
 
   const assistantText = driver.extractAssistant(runResult, mode);
 
-  // M11.5: outbound redact-placeholder invariant.
-  // If we redacted on the way in, no placeholder should appear in the
+  // Outbound redact-placeholder invariant: if we redacted on the way in,
+  // no placeholder should appear in the
   // model's output that wasn't given to it. A placeholder it never saw
   // is evidence of exfiltration or hallucination of redaction tokens.
   if (willRedact && typeof assistantText === "string") {

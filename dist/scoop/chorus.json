@@ -2,11 +2,11 @@
   "version": "0.1.0",
   "description": "Multi-CLI agent collaboration toolkit",
   "homepage": "https://github.com/ghaaf-labs/chorus",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "notes": "Windows is not a supported Chorus v0.1.0 platform; this manifest is for validation before support is declared.",
   "depends": "nodejs-lts",
   "url": "https://registry.npmjs.org/@chorus/cli/-/cli-0.1.0.tgz",
-  "hash": "dca9d53051c052ad3276047daab93e1e4c7aa997db919d316ab7dd225024c968",
+  "hash": "84a123aee485c5bd89a346846615f2437a1721902302a45315ec1e0d8c4e3476",
   "extract_dir": "package",
   "bin": [["bin\\chorus", "chorus"]],
   "checkver": {

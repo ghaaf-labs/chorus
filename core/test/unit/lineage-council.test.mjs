@@ -13,7 +13,7 @@ let tmpHome;
 
 beforeEach(() => {
   saved = { HOME: process.env.HOME };
-  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-m7-"));
+  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-lineage-council-"));
   process.env.HOME = tmpHome;
 });
 
@@ -142,11 +142,11 @@ describe("lineage rendering", () => {
   });
 
   it("mermaid output starts with graph BT", async () => {
-    await appendJobIndex({ job_id: "m1", source: "cli", target: "codex", role: "reviewer", ok: true, duration_ms: 100, parent_job_ids: [] });
-    const tree = buildLineage("m1");
+    await appendJobIndex({ job_id: "job-a", source: "cli", target: "codex", role: "reviewer", ok: true, duration_ms: 100, parent_job_ids: [] });
+    const tree = buildLineage("job-a");
     const mm = renderMermaid(tree);
     expect(mm.startsWith("graph BT")).toBe(true);
-    expect(mm).toContain("m1");
+    expect(mm).toContain("job-a");
   });
 });
 

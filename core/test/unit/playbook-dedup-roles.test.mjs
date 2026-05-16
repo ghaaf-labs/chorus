@@ -14,7 +14,7 @@ let tmpHome;
 
 beforeEach(() => {
   saved = { HOME: process.env.HOME };
-  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-m11-"));
+  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-playbook-dedup-"));
   process.env.HOME = tmpHome;
 });
 
@@ -137,7 +137,7 @@ describe("dedup.findNearDuplicate (Jaccard)", () => {
   });
 });
 
-describe("M11 new roles registered", () => {
+describe("specialized roles registered", () => {
   it("test-writer / bisector / profiler in ROLE_NAMES with valid fallbacks", () => {
     for (const role of ["test-writer", "bisector", "profiler"]) {
       expect(ROLE_NAMES).toContain(role);

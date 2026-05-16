@@ -23,7 +23,7 @@ beforeEach(() => {
     CHORUS_SPEND_LEDGER_PATH: process.env.CHORUS_SPEND_LEDGER_PATH,
     CHORUS_DISABLE_AGENTS_MD: process.env.CHORUS_DISABLE_AGENTS_MD
   };
-  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-m9-"));
+  tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "chorus-budget-observability-"));
   process.env.HOME = tmpHome;
   process.env.CHORUS_BUDGET_PATH = path.join(tmpHome, ".chorus", "budget.json");
   process.env.CHORUS_SPEND_LEDGER_PATH = path.join(tmpHome, ".chorus", "daily-spend.jsonl");

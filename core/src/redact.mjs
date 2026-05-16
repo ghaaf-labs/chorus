@@ -17,8 +17,8 @@
  *   - hostname_internal *.internal, *.local, *.corp, *.lan
  *
  * Off-by-default. Enabled via callOne({ redact: true }) or `--redact` CLI
- * flag or env `CHORUS_REDACT=1`. Per the M6.5 plan: opt-in only — Chorus
- * does not silently rewrite content.
+ * flag or env `CHORUS_REDACT=1`. Opt-in only — Chorus does not silently
+ * rewrite content.
  */
 
 function luhnOk(num) {

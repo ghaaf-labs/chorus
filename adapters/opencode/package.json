@@ -4,5 +4,5 @@
   "description": "OpenCode plugin that exposes Chorus's cross-CLI agent collaboration (review, research, architect, devils-advocate) via @chorus- subagents.",
   "type": "module",
   "main": "./src/plugin.mjs",
-  "license": "Apache-2.0"
+  "license": "MIT"
 }

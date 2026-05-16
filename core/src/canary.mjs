@@ -6,8 +6,8 @@
  * target read an injected instruction inside <untrusted> content and
  * followed it — a clear prompt-injection signal.
  *
- * Canary chunks are also injectable via M8's retriever for live testing;
- * for now, `chorus canary check` scans recent envelopes for breach tokens.
+ * Canary chunks can be injected through retrieval paths for live testing.
+ * `chorus canary check` also scans recent envelopes for breach tokens.
  */
 
 import fs from "node:fs";

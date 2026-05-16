@@ -58,7 +58,7 @@
   "engines": {
     "node": ">=22.14"
   },
-  "license": "Apache-2.0",
+  "license": "MIT",
   "homepage": "https://github.com/ghaaf-labs/chorus",
   "repository": {
     "type": "git",

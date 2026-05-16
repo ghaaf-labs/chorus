@@ -5,6 +5,10 @@ Codex CLI, xAI Grok CLI, OpenCode, Grok Build, GitHub Copilot CLI, and a local
 Knowledge Index target call each other for review, research, planning, and
 adversarial critique without stuffing the caller's context window.
 
+Use Chorus when you want a second agent to review a diff, a small council to
+compare designs, a retrieval peer to ground an answer in local workspace docs,
+or a trust report that tells you whether your agent mesh is still behaving.
+
 ## Install
 
 ```bash
@@ -27,6 +31,23 @@ chorus trust report
 
 Chorus shells out to official CLIs and uses their existing login state. It does
 not manage API keys.
+
+## Common Workflows
+
+```bash
+# Ask one target for structured review.
+chorus call --role reviewer --target codex --task "Review this patch" --input-file changes.patch
+
+# Compare several targets and require agreement.
+chorus council --role architect --targets codex,grok,opencode --task "Choose a release design" --quorum 2-of-3
+
+# Re-run an old job against another target.
+chorus replay <job_id> --target claude-code
+
+# Inspect safety history.
+chorus canary check
+chorus trust --ci
+```
 
 ## Targets
 
@@ -72,6 +93,10 @@ chorus trust --ci
 Telemetry is zero by default. Spans are written only when `CHORUS_OTEL_FILE` or
 `CHORUS_OTEL_ENDPOINT` is set.
 
+Chorus stores local job metadata under `~/.chorus/`. Raw prompts and target
+stdout stay in local payload sidecars for replay and debugging; returned
+envelopes contain only the validated summary fields.
+
 ## Docs
 
 - `docs/install.md` — first install and target authentication
@@ -92,6 +117,10 @@ npm run eval:check
 npm pack --dry-run
 ```
 
+Before publishing, run `npm publish --dry-run --provenance --access public`.
+The tag-based release workflow publishes with npm provenance and attaches a
+CycloneDX SBOM to the GitHub Release.
+
 ## License
 
-Apache-2.0.
+MIT.

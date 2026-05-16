@@ -35,7 +35,8 @@ If a fix is available before the disclosure window closes, we release it as a pa
 In scope:
 
 - Code execution via crafted task/input through any subcommand
-- Prompt-injection escapes that defeat M11.5's outbound `placeholder_leak` invariant or the `<untrusted>` content sandbox
+- Prompt-injection escapes that defeat the outbound `placeholder_leak` invariant
+  or the `<untrusted>` content sandbox
 - Canary breach attribution failures (false negatives on the canary fuzz suite)
 - Cost firewall bypass that allows unbudgeted spend
 - Logging that leaks secrets to `~/.chorus/jobs.jsonl` or `.payload.json` despite `--redact`

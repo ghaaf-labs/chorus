@@ -10,7 +10,7 @@ Per-host install + behaviour notes. The Claude Code, Codex, and Grok adapters sh
 ln -sf "$(pwd)/adapters/claude" ~/.claude/plugins/chorus
 ```
 
-Or use Claude's marketplace once published (M4+).
+Or use Claude's marketplace once the plugin is published there.
 
 **What it ships:**
 
@@ -78,7 +78,9 @@ Then inside OpenCode: `@chorus-reviewer review my staged changes`.
 
 - `--pure` is always passed when OpenCode is the target. Without it, OpenCode would re-load this plugin recursively.
 - Model strings use `<provider>/<model>` shape (e.g. `opencode/claude-haiku-4-5`). This differs from the other three adapters which use bare model names.
-- OpenCode's JS plugin (`adapters/opencode/src/plugin.mjs`) is currently a minimal scaffold. M5 may add in-process `chorus_call`/`chorus_council` tools that bypass the CLI wrapper for tighter latency.
+- OpenCode's JS plugin (`adapters/opencode/src/plugin.mjs`) is currently a
+  minimal scaffold. A future release can add in-process `chorus_call` and
+  `chorus_council` tools that bypass the CLI wrapper for tighter latency.
 
 ## Recursion safety summary
 
