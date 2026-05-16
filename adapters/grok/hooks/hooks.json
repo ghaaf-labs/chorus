@@ -1,0 +1,16 @@
+{
+  "description": "Refresh Chorus capability registry on Grok session start if older than 24h.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${GROK_PLUGIN_ROOT}/../../bin/chorus\" setup --quiet || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "chorus",
+  "version": "0.1.0",
+  "description": "Collaborate with Claude Code, Codex, and OpenCode from Grok. Delegate review, research, architecture, and devil's-advocate critique to a buddy CLI without poisoning your context.",
+  "author": { "name": "Ghaaf" },
+  "homepage": "https://github.com/ghaaf/chorus",
+  "license": "Apache-2.0"
+}

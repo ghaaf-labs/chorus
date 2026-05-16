@@ -4,6 +4,7 @@ import { childEnv, checkGuards, currentDepth, maxDepth } from "./recursion-guard
 import * as claudeDriver from "./targets/claude.mjs";
 import * as codexDriver from "./targets/codex.mjs";
 import * as opencodeDriver from "./targets/opencode.mjs";
+import * as grokDriver from "./targets/grok.mjs";
 import { SUBPROCESS } from "./targets/driver.mjs";
 import { runSubprocess } from "./runners/process.mjs";
 import { composePrompt } from "./roles/compose.mjs";
@@ -16,7 +17,8 @@ import { estimateCostUsd } from "./pricing.mjs";
 const DRIVERS = {
   "claude-code": claudeDriver,
   codex: codexDriver,
-  opencode: opencodeDriver
+  opencode: opencodeDriver,
+  grok: grokDriver
 };
 
 const ERROR_HINTS = {
