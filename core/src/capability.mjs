@@ -23,6 +23,14 @@ const PROBES = {
   knowledge: {
     binary: "uv",
     versionArgs: ["--version"]
+  },
+  "grok-build": {
+    binary: "grok",
+    versionArgs: ["build", "--version"]
+  },
+  copilot: {
+    binary: "copilot",
+    versionArgs: ["--version"]
   }
 };
 
