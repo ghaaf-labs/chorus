@@ -24,7 +24,7 @@
     "ajv-formats": "^3.0.1"
   },
   "devDependencies": {
-    "vitest": "^2.1.0"
+    "vitest": "^4.1.6"
   },
   "engines": {
     "node": ">=20"
