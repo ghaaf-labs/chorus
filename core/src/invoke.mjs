@@ -35,6 +35,7 @@ const ERROR_HINTS = {
   timeout: "Increase --timeout, or check whether the target is hanging.",
   aborted: "The call was cancelled by the caller (Ctrl-C, session/cancel, or AbortController.abort()).",
   budget_exceeded: "Budget firewall blocked the call. Edit ~/.chorus/budget.json (set warn_only: true to log instead of block) or pass a cheaper --model.",
+  placeholder_leak: "Model output contained a <chorus-redacted:*> placeholder that wasn't in the input mapping — possible exfiltration or token hallucination. Quarantined.",
   stdout_overflow: "The target emitted more output than CHORUS_STDOUT_MAX_BYTES allows; the target may be misbehaving.",
   schema_violation: "The target's reply did not match the role's JSON schema. Inspect the .payload.json sidecar in ~/.chorus/logs/ for the raw output.",
   spawn_failed: "Could not start the target binary. Run `chorus doctor` to verify it is installed and authed.",
@@ -275,6 +276,27 @@ export async function callOne({
   }
 
   const assistantText = driver.extractAssistant(runResult, mode);
+
+  // M11.5: outbound redact-placeholder invariant.
+  // If we redacted on the way in, no placeholder should appear in the
+  // model's output that wasn't given to it. A placeholder it never saw
+  // is evidence of exfiltration or hallucination of redaction tokens.
+  if (willRedact && typeof assistantText === "string") {
+    const inputPlaceholders = new Set(redactionMapping.map((m) => m.placeholder));
+    const outputPlaceholders = assistantText.match(/<chorus-redacted:[a-z_]+:\d+>/g) ?? [];
+    const leaked = outputPlaceholders.filter((p) => !inputPlaceholders.has(p));
+    if (leaked.length) {
+      logger.event("placeholder_leak", { leaked });
+      await logger.close();
+      await appendJobIndex({ ...baseFields, ok: false, error: "placeholder_leak", log_path: logPath });
+      return errorEnvelope({
+        source, target, role, model, parentJobIds,
+        error: "placeholder_leak",
+        detail: { leaked }
+      });
+    }
+  }
+
   let tokens = driver.extractTokens(runResult, mode);
   // ACP token fallback: most ACP-mode drivers can't recover usage stats from
   // the agent (the spec doesn't standardize it). When tokens are zero on ACP,
