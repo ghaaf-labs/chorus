@@ -17,6 +17,21 @@ chorus init --yes
 chorus doctor
 ```
 
+`chorus init --yes` writes `~/.chorus/budget.json` and registers Chorus as a
+plugin for every host CLI it detects (Claude Code, Codex CLI, Grok, OpenCode).
+After this, `/chorus:*` slash commands, `chorus-*` agents, and Chorus skills
+appear inside each host on its next restart.
+
+For direct control over plugin registration:
+
+```bash
+chorus install --host all          # copy adapters into each host's plugin dir
+chorus install --host claude       # one host only
+chorus install --link              # dev mode: symlink instead of copy
+chorus uninstall --host all        # reverse
+chorus doctor                      # shows per-host registration status
+```
+
 Requirements: Node.js 22.14 or newer. macOS is tested locally, Linux is tested
 in CI, and Windows is not a supported v0.1.0 platform.
 

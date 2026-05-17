@@ -5,6 +5,7 @@ import path from "node:path";
 import readline from "node:readline/promises";
 import { stdin as defaultInput, stdout as defaultOutput } from "node:process";
 import { probeInstall } from "./probe.mjs";
+import { installAll, summarizeForDisplay } from "../install/index.mjs";
 
 const DEFAULT_BUDGET = {
   daily_usd: 5,
@@ -30,7 +31,14 @@ async function ask(rl, question, fallback = "y") {
   return answer || fallback;
 }
 
-export async function runInitWizard({ input = defaultInput, output = defaultOutput, yes = false, probe: providedProbe } = {}) {
+export async function runInitWizard({
+  input = defaultInput,
+  output = defaultOutput,
+  yes = false,
+  probe: providedProbe,
+  installer = installAll,
+  skipInstall = false
+} = {}) {
   const probe = providedProbe ?? probeInstall();
   await fsp.mkdir(chorusDir(), { recursive: true, mode: 0o700 });
 
@@ -46,6 +54,7 @@ export async function runInitWizard({ input = defaultInput, output = defaultOutp
   const existingBudget = fs.existsSync(budgetPath());
   let createBudget = yes || !existingBudget;
   let runKnowledgeHint = false;
+  let registerPlugins = yes;
   let rl;
 
   if (!yes && input.isTTY !== false) {
@@ -54,6 +63,7 @@ export async function runInitWizard({ input = defaultInput, output = defaultOutp
       if (!existingBudget) {
         createBudget = (await ask(rl, "\nCreate ~/.chorus/budget.json with safe defaults? [Y/n] ", "y")) !== "n";
       }
+      registerPlugins = (await ask(rl, "Register Chorus as a plugin for available hosts (claude/codex/grok/opencode)? [Y/n] ", "y")) !== "n";
       runKnowledgeHint = (await ask(rl, "Print optional Knowledge Index bootstrap commands? [y/N] ", "n")) === "y";
     } finally {
       rl.close();
@@ -67,6 +77,15 @@ export async function runInitWizard({ input = defaultInput, output = defaultOutp
     writeLine(output, `\nkept existing ${budgetPath()}`);
   }
 
+  let installResults = null;
+  if (registerPlugins && !skipInstall) {
+    writeLine(output, "\nregistering plugins:");
+    installResults = installer({ probe: probe.hosts, mode: "copy" });
+    writeLine(output, summarizeForDisplay(installResults));
+  } else if (!registerPlugins) {
+    writeLine(output, "\nskipped plugin registration — run `chorus install` to register later");
+  }
+
   if (runKnowledgeHint || yes) {
     writeLine(output, "\noptional Knowledge Index bootstrap:");
     writeLine(output, "  cd ../tools/knowledge-index");
@@ -76,5 +95,11 @@ export async function runInitWizard({ input = defaultInput, output = defaultOutp
   writeLine(output, "\nnext:");
   writeLine(output, "  chorus doctor");
   writeLine(output, "  chorus doctor --deep");
-  return { ok: true, available: probe.available, budget_path: budgetPath(), budget_created: createBudget && !existingBudget };
+  return {
+    ok: true,
+    available: probe.available,
+    budget_path: budgetPath(),
+    budget_created: createBudget && !existingBudget,
+    install_results: installResults
+  };
 }

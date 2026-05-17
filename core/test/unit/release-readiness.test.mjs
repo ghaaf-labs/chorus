@@ -23,8 +23,19 @@ describe("package.json publish hygiene", () => {
     expect(pkg.files).toContain("roles/");
     expect(pkg.files).toContain("docs/");
     expect(pkg.files).toContain("examples/");
+    expect(pkg.files).toContain("adapters/");
     expect(pkg.files).toContain("LICENSE");
     expect(pkg.files).toContain("README.md");
+  });
+
+  it("plugin manifests for claude/codex/grok declare MIT and ghaaf-labs", () => {
+    for (const host of ["claude", "codex", "grok"]) {
+      const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, "adapters", host, `.${host}-plugin`, "plugin.json"), "utf8"));
+      expect(manifest.license, host).toBe("MIT");
+      expect(manifest.homepage, host).toContain("ghaaf-labs/chorus");
+      expect(manifest.name, host).toBe("chorus");
+      expect(manifest.version, host).toBe(pkg.version);
+    }
   });
 
   it("publishConfig.access is 'public' (scoped package)", () => {

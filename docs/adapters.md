@@ -2,15 +2,27 @@
 
 Per-host install + behaviour notes. The Claude Code, Codex, and Grok adapters share the same shape (plugin manifest + symlinks to `shared/{agents,commands,skills}` + SessionStart hook). OpenCode is a JS plugin and follows a slightly different layout.
 
+The recommended way to install every adapter is `chorus install` (which `chorus init --yes` calls automatically). The manual commands below remain as the dev/fallback path.
+
 ## Claude Code (`adapters/claude/`)
 
-**Install (local development):**
+**Install:**
 
 ```bash
-ln -sf "$(pwd)/adapters/claude" ~/.claude/plugins/chorus
+chorus install --host claude          # copy adapter + register in installed_plugins.json
+chorus install --host claude --link   # dev: symlink instead of copy
 ```
 
-Or use Claude's marketplace once the plugin is published there.
+**Manual fallback:**
+
+```bash
+mkdir -p ~/.chorus/marketplaces/claude && cp -R adapters/claude ~/.chorus/marketplaces/claude/plugins/chorus
+# write ~/.chorus/marketplaces/claude/.claude-plugin/marketplace.json (see chorus install for the schema)
+claude plugin marketplace add ~/.chorus/marketplaces/claude
+claude plugin install chorus@chorus --scope user
+```
+
+A bare symlink to `~/.claude/plugins/chorus/` is **not** sufficient — Claude Code only loads plugins that came through `/plugin install` (which writes `installed_plugins.json` and copies to `~/.claude/plugins/cache/`). `chorus install` does this via the documented `claude plugin install` CLI.
 
 **What it ships:**
 
@@ -30,8 +42,20 @@ Or use Claude's marketplace once the plugin is published there.
 **Install:**
 
 ```bash
-ln -sf "$(pwd)/adapters/codex" ~/.codex/plugins/chorus
+chorus install --host codex          # copy adapter + write [marketplaces.chorus] + [plugins."chorus@chorus"] to ~/.codex/config.toml
+chorus install --host codex --link   # dev: symlink instead of copy
 ```
+
+**Manual fallback:**
+
+```bash
+mkdir -p ~/.chorus/marketplaces/codex/plugins/chorus && cp -R adapters/codex/. ~/.chorus/marketplaces/codex/plugins/chorus/
+# write ~/.chorus/marketplaces/codex/.agents/plugins/marketplace.json
+codex plugin marketplace add ~/.chorus/marketplaces/codex
+# manually add [plugins."chorus@chorus"]\nenabled = true to ~/.codex/config.toml
+```
+
+`codex plugin marketplace add` writes the `[marketplaces.chorus]` block but does not enable individual plugins. `chorus install` adds the `[plugins."chorus@chorus"] enabled = true` block on top, taking a `.bak` of the config before mutation.
 
 **Shape:** mirrors the Claude adapter — same plugin.json layout, same shared/ symlinks, same SessionStart hook (but expanded as `${CODEX_PLUGIN_ROOT}`).
 
@@ -46,8 +70,17 @@ ln -sf "$(pwd)/adapters/codex" ~/.codex/plugins/chorus
 **Install:**
 
 ```bash
+chorus install --host grok          # copy adapter to ~/.grok/plugins/chorus
+chorus install --host grok --link   # dev: symlink instead of copy
+```
+
+**Manual fallback (dev only):**
+
+```bash
 ln -sf "$(pwd)/adapters/grok" ~/.grok/plugins/chorus
 ```
+
+Grok directory-scans `~/.grok/plugins/` so the symlink alone is sufficient for the plugin to be discovered. `chorus install` is the supported entry point so registration state is tracked by `chorus doctor`.
 
 **Behaviour notes:**
 
@@ -63,7 +96,13 @@ OpenCode's plugin model is different — JS modules, not markdown trees.
 **Install (caller side — OpenCode as host):**
 
 ```bash
-# Link the four chorus-* caller subagents into your OpenCode agent dir
+chorus install --host opencode           # copy the four chorus-* agent files
+chorus install --host opencode --link    # dev: symlink instead of copy
+```
+
+**Manual fallback:**
+
+```bash
 ln -sf "$(pwd)/adapters/opencode/agents/chorus-reviewer.md"        ~/.config/opencode/agent/chorus-reviewer.md
 ln -sf "$(pwd)/adapters/opencode/agents/chorus-researcher.md"      ~/.config/opencode/agent/chorus-researcher.md
 ln -sf "$(pwd)/adapters/opencode/agents/chorus-architect.md"       ~/.config/opencode/agent/chorus-architect.md

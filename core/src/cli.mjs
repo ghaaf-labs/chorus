@@ -26,6 +26,8 @@ usage:
   chorus trust [report|--ci] [--since 24h] [--max-drift N] [--json]
   chorus canary fuzz [--rounds N] [--target X] [--classes a,b,c]
   chorus init [--yes]
+  chorus install [--host <name>|all] [--link] [--force] [--dry-run] [--json]
+  chorus uninstall [--host <name>|all] [--force] [--dry-run] [--json]
   chorus acp                      start ACP server on stdio (for Zed/JetBrains/etc)
   chorus setup [--refresh-stale <hours>]
   chorus doctor [--deep]
@@ -99,6 +101,10 @@ export async function main(argv) {
       return cmdAcp();
     case "init":
       return cmdInit(parseFlags(rest));
+    case "install":
+      return cmdInstall(parseFlags(rest));
+    case "uninstall":
+      return cmdUninstall(parseFlags(rest));
     case "setup":
       return cmdSetup(parseFlags(rest));
     case "doctor":
@@ -722,6 +728,53 @@ async function cmdInit(flags = {}) {
   return result.ok ? 0 : 1;
 }
 
+function resolveInstallHosts(flag) {
+  if (!flag || flag === "all" || flag === true) return undefined;
+  const wanted = String(flag).split(",").map((h) => h.trim()).filter(Boolean);
+  return wanted;
+}
+
+async function cmdInstall(flags = {}) {
+  const { installAll, HOSTS, summarizeForDisplay } = await import("./install/index.mjs");
+  const hosts = resolveInstallHosts(flags.host) || HOSTS;
+  const probeHosts = flags["skip-probe"] ? null : loadOrRefresh().hosts;
+  const results = installAll({
+    mode: flags.link ? "link" : "copy",
+    dryRun: Boolean(flags["dry-run"]),
+    force: Boolean(flags.force),
+    hosts,
+    probe: probeHosts
+  });
+  if (flags.json) {
+    process.stdout.write(JSON.stringify({ results }, null, 2) + "\n");
+  } else {
+    process.stdout.write(`chorus install — mode=${flags.link ? "link" : "copy"}${flags["dry-run"] ? " (dry-run)" : ""}\n`);
+    process.stdout.write(summarizeForDisplay(results) + "\n");
+    const failed = results.filter((r) => r.status === "error");
+    if (failed.length > 0) {
+      process.stdout.write(`\n${failed.length} host(s) failed. Re-run with --force or fix the conflict above.\n`);
+    }
+  }
+  return results.some((r) => r.status === "error") ? 1 : 0;
+}
+
+async function cmdUninstall(flags = {}) {
+  const { uninstallAll, HOSTS, summarizeForDisplay } = await import("./install/index.mjs");
+  const hosts = resolveInstallHosts(flags.host) || HOSTS;
+  const results = uninstallAll({
+    dryRun: Boolean(flags["dry-run"]),
+    force: Boolean(flags.force),
+    hosts
+  });
+  if (flags.json) {
+    process.stdout.write(JSON.stringify({ results }, null, 2) + "\n");
+  } else {
+    process.stdout.write(`chorus uninstall${flags["dry-run"] ? " (dry-run)" : ""}\n`);
+    process.stdout.write(summarizeForDisplay(results) + "\n");
+  }
+  return results.some((r) => r.status === "error") ? 1 : 0;
+}
+
 async function cmdSetup(flags) {
   const data = refreshRegistry();
   if (flags.quiet) return 0;
@@ -746,6 +799,21 @@ async function cmdDoctor(flags = {}) {
     } else {
       lines.push(`  ${name.padEnd(14)} ✗  ${info.reason || ""}`.trimEnd());
     }
+  }
+
+  const { statusAll } = await import("./install/index.mjs");
+  const pluginStatus = statusAll();
+  const notRegistered = [];
+  lines.push(``, `chorus plugin registration:`);
+  for (const r of pluginStatus) {
+    const mark = r.status === "registered" ? "✓" : r.status === "registered_stale" ? "⚠" : r.status === "n/a" ? "—" : "✗";
+    lines.push(`  ${r.host.padEnd(14)} ${mark}  ${r.status}${r.reason ? ` (${r.reason})` : ""}`);
+    if (r.status === "not_registered" || r.status === "registered_stale") {
+      notRegistered.push(r.host);
+    }
+  }
+  if (notRegistered.length > 0) {
+    lines.push(``, `hint: run \`chorus install --host ${notRegistered.length === 1 ? notRegistered[0] : "all"}\` to register`);
   }
   process.stdout.write(lines.join("\n") + "\n");
 

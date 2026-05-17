@@ -24,6 +24,7 @@ replaces symlinks with file copies at npm-publish time.
 - No comments unless the *why* is non-obvious. Identifier names carry the *what*.
 - All target invocations go through `core/src/invoke.mjs`. Never spawn a CLI directly from a target adapter — the adapter only builds argv + stdin envelope.
 - Schema-validate every result. Truncate string fields > `CHORUS_SUMMARY_MAX_CHARS`. Never return raw subprocess stdout to a caller.
+- Host-CLI install side effects live in `core/src/install/` only. Don't write to `~/.{claude,codex,grok}/` from `init/`, `capability.mjs`, or adapter code — every mutation must go through an install handler so backups, idempotency, and `chorus doctor` reporting stay coherent.
 
 ## When in doubt
 

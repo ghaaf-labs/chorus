@@ -5,7 +5,21 @@ Changelog style and uses Conventional Commits.
 
 ## [Unreleased]
 
-- No unreleased changes yet.
+### Added
+
+- `chorus install` / `chorus uninstall` register the per-host adapter as a
+  plugin for Claude Code, Codex CLI, Grok, and OpenCode. Default mode is
+  `copy`; `--link` symlinks for dev.
+- `chorus init --yes` now auto-registers Chorus as a plugin for every host
+  it detects. Interactive init prompts before registering.
+- `chorus doctor` reports per-host plugin registration status and suggests
+  `chorus install` when a host is detected but not registered.
+
+### Fixed
+
+- Plugin manifests (`adapters/{claude,codex,grok}/.{host}-plugin/plugin.json`)
+  declared `Apache-2.0` and the wrong GitHub org; corrected to `MIT` and
+  `ghaaf-labs/chorus` to match the root package.
 
 ## [0.1.0] - 2026-05-16
 

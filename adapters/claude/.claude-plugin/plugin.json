@@ -1,8 +1,10 @@
 {
   "name": "chorus",
   "version": "0.1.0",
-  "description": "Collaborate with Codex, Grok, and OpenCode from Claude Code. Delegate review, research, architecture, and devil's-advocate critique to a buddy CLI without poisoning your context.",
+  "description": "Collaborate with Codex, Grok, OpenCode, Grok Build, GitHub Copilot CLI, and a local Knowledge Index peer from Claude Code. Delegate review, research, architecture, devil's-advocate critique, and retrieval to a buddy CLI without poisoning your context.",
   "author": { "name": "Ghaaf" },
-  "homepage": "https://github.com/ghaaf/chorus",
-  "license": "Apache-2.0"
+  "homepage": "https://github.com/ghaaf-labs/chorus",
+  "repository": "https://github.com/ghaaf-labs/chorus",
+  "bugs": "https://github.com/ghaaf-labs/chorus/issues",
+  "license": "MIT"
 }
