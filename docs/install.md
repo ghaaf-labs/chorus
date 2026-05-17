@@ -11,7 +11,9 @@ chorus doctor
 ```
 
 `chorus init --yes` writes `~/.chorus/budget.json` and registers Chorus as a
-plugin for every host CLI it detects.
+plugin for every host CLI it detects. Interactive `chorus init` prompts before
+registering; plain non-interactive `chorus init` (no `--yes`, no TTY) skips
+registration — run `chorus install` afterwards.
 
 For a local tarball smoke test:
 

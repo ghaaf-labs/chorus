@@ -78,10 +78,15 @@ export async function runInitWizard({
   }
 
   let installResults = null;
+  let installErrors = 0;
   if (registerPlugins && !skipInstall) {
     writeLine(output, "\nregistering plugins:");
     installResults = installer({ probe: probe.hosts, mode: "copy" });
     writeLine(output, summarizeForDisplay(installResults));
+    installErrors = installResults.filter((r) => r.status === "error").length;
+    if (installErrors > 0) {
+      writeLine(output, `\n${installErrors} host(s) failed to register — re-run with \`chorus install --force\` or fix the conflict above`);
+    }
   } else if (!registerPlugins) {
     writeLine(output, "\nskipped plugin registration — run `chorus install` to register later");
   }
@@ -96,10 +101,11 @@ export async function runInitWizard({
   writeLine(output, "  chorus doctor");
   writeLine(output, "  chorus doctor --deep");
   return {
-    ok: true,
+    ok: installErrors === 0,
     available: probe.available,
     budget_path: budgetPath(),
     budget_created: createBudget && !existingBudget,
-    install_results: installResults
+    install_results: installResults,
+    install_errors: installErrors
   };
 }

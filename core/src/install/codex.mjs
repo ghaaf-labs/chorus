@@ -127,9 +127,11 @@ export function install({
 export function uninstall({
   home: homeOverride,
   dryRun = false,
+  force = false,
   runner = defaultRunner,
   probe = defaultProbe
 } = {}) {
+  void force;
   const home = resolveHome(homeOverride);
   if (!home) return { host, status: "error", reason: "no_home" };
   if (dryRun) {

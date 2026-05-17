@@ -9,6 +9,7 @@ import * as grok from "../../src/install/grok.mjs";
 import * as opencode from "../../src/install/opencode.mjs";
 import { installAll, uninstallAll, statusAll, HOSTS } from "../../src/install/index.mjs";
 import { buildMarketplace, marketplaceDir } from "../../src/install/marketplace.mjs";
+import { CHORUS_MARKER, atomicWriteFile, destBelongsToChorus, hasMarker, writeMarker } from "../../src/install/fs-util.mjs";
 
 let tmpHome;
 let savedHome;
@@ -34,6 +35,71 @@ function fakeRunner(captured) {
 
 const okProbe = () => true;
 const nopeProbe = () => false;
+
+describe("destBelongsToChorus + marker", () => {
+  it("marker presence + valid name proves ownership", () => {
+    const dir = path.join(tmpHome, "x");
+    fs.mkdirSync(dir, { recursive: true });
+    writeMarker(dir);
+    expect(hasMarker(dir)).toBe(true);
+    expect(destBelongsToChorus(dir)).toBe(true);
+  });
+
+  it("a marker file with wrong name does NOT prove ownership", () => {
+    const dir = path.join(tmpHome, "y");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, CHORUS_MARKER), JSON.stringify({ name: "not-chorus" }));
+    expect(hasMarker(dir)).toBe(false);
+    expect(destBelongsToChorus(dir)).toBe(false);
+  });
+
+  it("a plugin.json manifest alone is NOT enough — only marker counts", () => {
+    const dir = path.join(tmpHome, "z");
+    fs.mkdirSync(path.join(dir, ".claude-plugin"), { recursive: true });
+    fs.writeFileSync(path.join(dir, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "chorus" }));
+    expect(destBelongsToChorus(dir)).toBe(false);
+  });
+
+  it("symlink pointing INSIDE the chorus adapters/ tree counts as ours", () => {
+    const link = path.join(tmpHome, "sym");
+    const target = path.join("/Users/malivix/Documents/ghaaf/chorus/adapters/claude");
+    if (!fs.existsSync(target)) return;
+    fs.symlinkSync(target, link);
+    expect(destBelongsToChorus(link)).toBe(true);
+  });
+
+  it("symlink to a path with /adapters/ in the name but NOT inside chorus is NOT ours", () => {
+    const fakeAdapters = path.join(tmpHome, "user-app", "adapters", "thing");
+    fs.mkdirSync(fakeAdapters, { recursive: true });
+    const link = path.join(tmpHome, "sym2");
+    fs.symlinkSync(fakeAdapters, link);
+    expect(destBelongsToChorus(link)).toBe(false);
+  });
+});
+
+describe("atomicWriteFile", () => {
+  it("preserves the original file's mode", () => {
+    const f = path.join(tmpHome, "perm.txt");
+    fs.writeFileSync(f, "old");
+    fs.chmodSync(f, 0o600);
+    atomicWriteFile(f, "new");
+    expect(fs.statSync(f).mode & 0o777).toBe(0o600);
+    expect(fs.readFileSync(f, "utf8")).toBe("new");
+  });
+
+  it("creates parent directories as needed", () => {
+    const f = path.join(tmpHome, "a", "b", "c.txt");
+    atomicWriteFile(f, "x");
+    expect(fs.readFileSync(f, "utf8")).toBe("x");
+  });
+
+  it("does not leave the temp file behind", () => {
+    const f = path.join(tmpHome, "ok.txt");
+    atomicWriteFile(f, "content");
+    const siblings = fs.readdirSync(tmpHome);
+    expect(siblings.filter((s) => s.startsWith("ok.txt.tmp"))).toEqual([]);
+  });
+});
 
 describe("marketplace builder", () => {
   it("creates a Claude-style marketplace.json at .claude-plugin/marketplace.json", () => {
@@ -109,8 +175,8 @@ describe("claude install", () => {
 
   it("uninstall sweeps the legacy chorus-owned ~/.claude/plugins/chorus dir", () => {
     const legacy = path.join(tmpHome, ".claude", "plugins", "chorus");
-    fs.mkdirSync(path.join(legacy, ".claude-plugin"), { recursive: true });
-    fs.writeFileSync(path.join(legacy, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "chorus" }));
+    fs.mkdirSync(legacy, { recursive: true });
+    writeMarker(legacy);
     claude.uninstall({ home: tmpHome, runner: fakeRunner([]), probe: nopeProbe });
     expect(fs.existsSync(legacy)).toBe(false);
   });
