@@ -10,6 +10,7 @@ import * as opencode from "../../src/install/opencode.mjs";
 import { installAll, uninstallAll, statusAll, HOSTS } from "../../src/install/index.mjs";
 import { buildMarketplace, marketplaceDir } from "../../src/install/marketplace.mjs";
 import { CHORUS_MARKER, atomicWriteFile, destBelongsToChorus, hasMarker, writeMarker } from "../../src/install/fs-util.mjs";
+import { chorusRoot } from "../../src/install/paths.mjs";
 
 let tmpHome;
 let savedHome;
@@ -62,8 +63,7 @@ describe("destBelongsToChorus + marker", () => {
 
   it("symlink pointing INSIDE the chorus adapters/ tree counts as ours", () => {
     const link = path.join(tmpHome, "sym");
-    const target = path.join("/Users/malivix/Documents/ghaaf/chorus/adapters/claude");
-    if (!fs.existsSync(target)) return;
+    const target = path.join(chorusRoot(), "adapters", "claude");
     fs.symlinkSync(target, link);
     expect(destBelongsToChorus(link)).toBe(true);
   });
@@ -98,6 +98,26 @@ describe("atomicWriteFile", () => {
     atomicWriteFile(f, "content");
     const siblings = fs.readdirSync(tmpHome);
     expect(siblings.filter((s) => s.startsWith("ok.txt.tmp"))).toEqual([]);
+  });
+
+  it("new file uses 0o644 default mode (modulo umask)", () => {
+    const f = path.join(tmpHome, "new.txt");
+    atomicWriteFile(f, "x");
+    const expected = 0o644 & ~process.umask();
+    expect(fs.statSync(f).mode & 0o777).toBe(expected);
+  });
+});
+
+describe("opencode header marker", () => {
+  it("classifies a BOM-prefixed installed file as ours", () => {
+    const dir = path.join(tmpHome, ".config", "opencode", "agent");
+    fs.mkdirSync(dir, { recursive: true });
+    opencode.install({ home: tmpHome });
+    const f = path.join(dir, "chorus-reviewer.md");
+    const orig = fs.readFileSync(f, "utf8");
+    fs.writeFileSync(f, String.fromCharCode(0xFEFF) + orig);
+    const result = opencode.status({ home: tmpHome });
+    expect(result.status).toBe("registered");
   });
 });
 

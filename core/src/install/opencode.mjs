@@ -34,15 +34,17 @@ function isOurFile(target) {
   if (!fs.existsSync(target) && !isSymlink(target)) return false;
   if (isSymlink(target)) {
     try {
-      const link = fs.readlinkSync(target);
-      const resolved = path.resolve(path.dirname(target), link);
-      return resolved.startsWith(path.dirname(sourceAgents()));
+      const linkTarget = fs.realpathSync(target);
+      const sourceReal = fs.realpathSync(sourceAgents());
+      return linkTarget === sourceReal || linkTarget.startsWith(sourceReal + path.sep);
     } catch {
       return false;
     }
   }
   try {
-    return fs.readFileSync(target, "utf8").startsWith(HEADER_MARKER);
+    const raw = fs.readFileSync(target, "utf8");
+    const content = raw.charCodeAt(0) === 0xFEFF ? raw.slice(1) : raw;
+    return content.startsWith(HEADER_MARKER);
   } catch {
     return false;
   }

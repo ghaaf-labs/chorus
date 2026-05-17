@@ -77,12 +77,29 @@ export function installToDest({ src, dest, mode }) {
   }
   const tmp = fs.mkdtempSync(path.join(parent, ".chorus-installing-"));
   const tmpInner = path.join(tmp, "payload");
+  const oldBackup = path.join(tmp, "old");
+  let movedOld = false;
   try {
     deepCopyMaterialized(src, tmpInner);
     writeMarker(tmpInner, { source: src, mode });
-    if (fs.existsSync(dest) || isSymlink(dest)) removeDest(dest);
-    fs.renameSync(tmpInner, dest);
+    if (fs.existsSync(dest) || isSymlink(dest)) {
+      fs.renameSync(dest, oldBackup);
+      movedOld = true;
+    }
+    try {
+      fs.renameSync(tmpInner, dest);
+      movedOld = false;
+    } catch (renameErr) {
+      if (movedOld) {
+        try { fs.renameSync(oldBackup, dest); } catch { /* leave backup for recovery */ }
+        movedOld = false;
+      }
+      throw renameErr;
+    }
   } finally {
+    if (movedOld && fs.existsSync(oldBackup)) {
+      try { fs.renameSync(oldBackup, dest); } catch { /* recovery best-effort */ }
+    }
     removeDest(tmp);
   }
 }
@@ -136,12 +153,35 @@ export function readlinkOrNull(p) {
   }
 }
 
+let cachedAdaptersReal = null;
+function adaptersRealPath() {
+  if (cachedAdaptersReal === null) {
+    try {
+      cachedAdaptersReal = fs.realpathSync(path.join(chorusRoot(), "adapters"));
+    } catch {
+      cachedAdaptersReal = "";
+    }
+  }
+  return cachedAdaptersReal;
+}
+
+function pathsEqual(a, b) {
+  return process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+
+function pathStartsWith(child, parent) {
+  if (process.platform === "win32") {
+    return child.toLowerCase().startsWith(parent.toLowerCase());
+  }
+  return child.startsWith(parent);
+}
+
 function isUnderChorusAdapters(absPath) {
   try {
-    const root = chorusRoot();
-    const adapters = path.join(root, "adapters");
+    const adapters = adaptersRealPath();
+    if (!adapters) return false;
     const real = fs.realpathSync(absPath);
-    return real === adapters || real.startsWith(adapters + path.sep);
+    return pathsEqual(real, adapters) || pathStartsWith(real, adapters + path.sep);
   } catch {
     return false;
   }
