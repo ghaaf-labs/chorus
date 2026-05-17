@@ -84,3 +84,11 @@ verdict so council consensus and judge mode can compare target outputs.
 - Targets with `runModes: [acp, ...]` share the same ACP pool entry within one process; concurrent council calls to the *same* target serialize on the same session.
 - The Knowledge Index target wraps a local Qdrant-backed store; plan for its
   local runtime characteristics when adding `--retrieve` to council fan-outs.
+- Codex occasionally returns `verdict: "inconclusive"` on tasks whose
+  description has many numbered sub-goals, especially when the role prompt is
+  also explicit about output format. The model reads `--output-schema` and
+  the prompt's "JSON only" wording as competing contracts and bails. Keep
+  role output instructions minimal (the schema is authoritative on its own),
+  prefer prose-style task descriptions over `(1) ... (2) ... (3) ...` lists,
+  or rerun with `--targets <a-non-codex-set>` if the inconclusive verdict
+  blocks the council quorum.

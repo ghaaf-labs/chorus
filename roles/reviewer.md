@@ -32,4 +32,4 @@ Verdict (Chorus-normalized):
 - `needs-attention` — at least one `high`-or-`critical` finding.
 - `inconclusive` — you could not perform the review (missing diff, unreadable input, unsupported language).
 
-Return strict JSON conforming to the supplied schema. No prose outside JSON. No markdown fences.
+Return the JSON object that matches the supplied schema. Nothing around it.
